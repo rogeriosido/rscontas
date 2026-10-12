@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>RS Contas</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1>Controle financeiro</h1>
+        <p>Contas a pagar e receber</p>
+      </div>
+    </header>
+
+    <section class="dashboard screen-panel" id="dashboardScreen">
+      <div class="quick-actions">
+        <button id="newAccountBtn" class="action-card primary-card" type="button" data-target="formPanel" data-title="Lançar conta">
+          <span class="card-icon">＋</span>
+          <span class="card-title">Lançar</span>
+        </button>
+
+        <button id="viewLaunchesBtn" class="action-card secondary-card" type="button" data-target="listPanel" data-title="Lançamentos">
+          <span class="card-icon">📋</span>
+          <span class="card-title">Lançamentos</span>
+        </button>
+
+        <button id="managementBtn" class="action-card secondary-card" type="button" data-target="managementPanel" data-title="Cadastros">
+          <span class="card-icon">⚙️</span>
+          <span class="card-title">Cadastros</span>
+        </button>
+      </div>
+
+      <div class="cards cards-duplas">
+        <article class="type-card pay-card">
+          <div class="type-title red">A pagar</div>
+          <div class="type-total red" id="totalPagar">R$ 0,00</div>
+
+          <div class="type-subgroup">
+            <div class="type-line">
+              <span>Pago</span>
+              <strong id="totalPagoPagar">R$ 0,00</strong>
+            </div>
+            <div class="type-line">
+              <span>Pendente</span>
+              <strong id="totalPendentePagar">R$ 0,00</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="type-card receive-card">
+          <div class="type-title green">A receber</div>
+          <div class="type-total green" id="totalReceber">R$ 0,00</div>
+
+          <div class="type-subgroup">
+            <div class="type-line">
+              <span>Pago</span>
+              <strong id="totalPagoReceber">R$ 0,00</strong>
+            </div>
+            <div class="type-line">
+              <span>Pendente</span>
+              <strong id="totalPendenteReceber">R$ 0,00</strong>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel screen-panel hidden" id="formPanel">
+      <div class="panel-title">
+        <div><h2 id="formTitle">Nova conta</h2><p>Informe os dados do lançamento.</p></div>
+        <div class="header-actions">
+          <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
+          <button class="icon-btn" id="closeFormBtn" type="button">✕</button>
+        </div>
+      </div>
+
+      <form id="accountForm">
+        <input type="hidden" id="accountId">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="titulo">Título</label>
+            <input id="titulo" maxlength="120" placeholder="Ex.: Conta de energia">
+          </div>
+
+          <div class="field">
+            <label for="tipoConta">Tipo *</label>
+            <select id="tipoConta" required>
+              <option value="">Selecione</option>
+              <option value="P">Pagar</option>
+              <option value="R">Receber</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="centroCusto">Centro de custo *</label>
+            <select id="centroCusto" required>
+              <option value="">Selecione</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="tipoDespesa">Tipo de despesa *</label>
+            <select id="tipoDespesa" required>
+              <option value="">Selecione</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="subtipoDespesa">Subtipo de despesa *</label>
+            <select id="subtipoDespesa" required>
+              <option value="">Selecione</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="valor">Valor *</label>
+            <input id="valor" required inputmode="decimal" placeholder="0,00">
+          </div>
+
+          <div class="field">
+            <label for="data">Data de pagamento *</label>
+            <div class="date-field">
+              <input id="data" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" required>
+              <button type="button" class="date-picker-btn" id="dataCalendarBtn" aria-label="Abrir calendário">📅</button>
+              <input id="dataNative" type="date" class="hidden-date-input" aria-label="Calendário">
+            </div>
+          </div>
+
+          <div class="field field-check">
+            <label>Status</label>
+            <label class="switch-row">
+              <input id="pago" type="checkbox">
+              <span class="switch"></span>
+              <span>Conta paga / recebida</span>
+            </label>
+          </div>
+
+          <div class="field span-3">
+            <label for="obs">Observação</label>
+            <textarea id="obs" maxlength="500" placeholder="Informações adicionais..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn secondary" id="cancelBtn">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar lançamento</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel screen-panel hidden" id="listPanel">
+      <div class="panel-title list-title">
+        <div><h2>Lançamentos</h2><p id="countText">0 contas cadastradas</p></div>
+        <div class="filters">
+          <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
+          <input id="search" class="search" placeholder="🔎 Pesquisar título...">
+          <select id="filterType"><option value="">Todos</option><option value="P">A pagar</option><option value="R">A receber</option></select>
+          <select id="filterStatus"><option value="">Todos</option><option value="pendente">Pendentes</option><option value="pago">Pagos</option></select>
+        </div>
+      </div>
+
+      <div class="launch-wrap">
+        <div id="accountTable" class="launch-grid"></div>
+        <div class="empty" id="emptyState">Nenhum lançamento encontrado.</div>
+      </div>
+    </section>
+
+    <section class="panel screen-panel hidden" id="managementPanel">
+      <div class="panel-title">
+        <div><h2>Cadastros</h2><p>Gerencie os valores dinâmicos do sistema.</p></div>
+        <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
+      </div>
+
+      <div class="management-tabs">
+        <button class="tab-btn active" type="button" data-tab="centros">Centro de custo</button>
+        <button class="tab-btn" type="button" data-tab="tipos">Tipo de despesa</button>
+        <button class="tab-btn" type="button" data-tab="subtipos">Subtipo de despesa</button>
+      </div>
+
+      <div class="management-content">
+        <div class="tab-panel active" id="centrosPanel">
+          <form id="centroForm" class="mini-form">
+            <input id="novoCentro" type="text" placeholder="Nome do centro de custo" maxlength="80" required>
+            <button type="submit" class="btn primary">Salvar centro</button>
+          </form>
+          <div id="centroList" class="tag-list"></div>
+        </div>
+
+        <div class="tab-panel" id="tiposPanel">
+          <form id="tipoForm" class="mini-form">
+            <input id="novoTipo" type="text" placeholder="Nome do tipo de despesa" maxlength="80" required>
+            <button type="submit" class="btn primary">Salvar tipo</button>
+          </form>
+          <div id="tipoList" class="tag-list"></div>
+        </div>
+
+        <div class="tab-panel" id="subtiposPanel">
+          <form id="subtipoForm" class="mini-form">
+            <input id="novoSubtipo" type="text" placeholder="Nome do subtipo de despesa" maxlength="80" required>
+            <button type="submit" class="btn primary">Salvar subtipo</button>
+          </form>
+          <div id="subtipoList" class="tag-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
