@@ -13,9 +13,3 @@ COMO USAR
 
 OBSERVAÇÃO
 Esta primeira versão não possui banco de dados nem servidor. É um protótipo local para validar a tela e o fluxo do sistema.
-
-Banco Dados - 
-supabase
-rscontas
-app-rscontas
-6CEAUyTYJHUjYbem
