@@ -302,8 +302,8 @@ def api_save_conta():
     conn = get_db_connection()
     conn.execute(
         """
-        INSERT INTO contas (id, titulo, tipo, centro, tipoDespesa, subtipo, valor, user_id, data, pago, obs, atualizadoEm)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO contas (id, titulo, tipo, centro, tipoDespesa, subtipo, pagamento, valor, user_id, data, pago, obs, atualizadoEm)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             titulo = excluded.titulo,
             tipo = excluded.tipo,
