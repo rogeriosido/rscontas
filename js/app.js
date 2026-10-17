@@ -451,7 +451,48 @@ function atualizar(){
     return okBusca && okTipo && okStatus;
   }).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
 
-  $('accountTable').innerHTML = lista.map(c => `
+  $('accountTable').innerHTML = renderLaunchCardsHTML(lista);
+
+  $('emptyState').style.display = lista.length ? 'none' : 'block';
+  $('countText').textContent = `${contas.length} ${contas.length === 1 ? 'conta cadastrada' : 'contas cadastradas'}`;
+
+  const pagarPago = contas.filter(c => c.tipo === 'P' && c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
+  const pagarPendente = contas.filter(c => c.tipo === 'P' && !c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
+  const pagarTotal = pagarPago + pagarPendente;
+
+  const receberPago = contas.filter(c => c.tipo === 'R' && c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
+  const receberPendente = contas.filter(c => c.tipo === 'R' && !c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
+  const receberTotal = receberPago + receberPendente;
+
+  $('totalPagar').textContent = dinheiro(pagarTotal);
+  $('totalPagoPagar').textContent = dinheiro(pagarPago);
+  $('totalPendentePagar').textContent = dinheiro(pagarPendente);
+
+  $('totalReceber').textContent = dinheiro(receberTotal);
+  $('totalPagoReceber').textContent = dinheiro(receberPago);
+  $('totalPendenteReceber').textContent = dinheiro(receberPendente);
+}
+
+function editar(id){ const conta = contas.find(c => c.id === id); if (conta) abrirForm(conta); }
+window.editar = editar;
+
+async function excluir(id){
+  const conta = contas.find(c => c.id === id);
+  if (!conta) return;
+
+  contas = contas.filter(c => c.id !== id);
+  const ok = await excluirContaApi(id);
+  if (ok) {
+    await carregarContasApi();
+  }
+  atualizar();
+}
+window.excluir = excluir;
+
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+
+function renderLaunchCardsHTML(lista){
+  return (lista || []).map(c => `
     <article class="launch-card" data-id="${c.id}">
       <div class="launch-header">
         <div class="launch-title">${esc(c.titulo)}</div>
@@ -496,44 +537,7 @@ function atualizar(){
         <span class="badge ${c.pago ? 'badge-pago' : 'badge-pendente'}">${c.pago ? 'Pago' : 'Pendente'}</span>
       </div>
     </article>`).join('');
-
-  $('emptyState').style.display = lista.length ? 'none' : 'block';
-  $('countText').textContent = `${contas.length} ${contas.length === 1 ? 'conta cadastrada' : 'contas cadastradas'}`;
-
-  const pagarPago = contas.filter(c => c.tipo === 'P' && c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
-  const pagarPendente = contas.filter(c => c.tipo === 'P' && !c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
-  const pagarTotal = pagarPago + pagarPendente;
-
-  const receberPago = contas.filter(c => c.tipo === 'R' && c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
-  const receberPendente = contas.filter(c => c.tipo === 'R' && !c.pago).reduce((s,c) => s + Number(c.valor || 0), 0);
-  const receberTotal = receberPago + receberPendente;
-
-  $('totalPagar').textContent = dinheiro(pagarTotal);
-  $('totalPagoPagar').textContent = dinheiro(pagarPago);
-  $('totalPendentePagar').textContent = dinheiro(pagarPendente);
-
-  $('totalReceber').textContent = dinheiro(receberTotal);
-  $('totalPagoReceber').textContent = dinheiro(receberPago);
-  $('totalPendenteReceber').textContent = dinheiro(receberPendente);
 }
-
-function editar(id){ const conta = contas.find(c => c.id === id); if (conta) abrirForm(conta); }
-window.editar = editar;
-
-async function excluir(id){
-  const conta = contas.find(c => c.id === id);
-  if (!conta) return;
-
-  contas = contas.filter(c => c.id !== id);
-  const ok = await excluirContaApi(id);
-  if (ok) {
-    await carregarContasApi();
-  }
-  atualizar();
-}
-window.excluir = excluir;
-
-function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
 
 const mostrarLista = () => {
   mostrarTela('listPanel');
@@ -557,6 +561,75 @@ const filterStatus = $('filterStatus');
 if (searchInput) searchInput.addEventListener('input', atualizar);
 if (filterType) filterType.addEventListener('change', atualizar);
 if (filterStatus) filterStatus.addEventListener('change', atualizar);
+
+// Grouping feature
+let currentGroupView = false;
+let currentGroupKey = null;
+
+function buildGroups(){
+  const groups = {}; // key -> {keyParts, total, count}
+  contas.forEach(c => {
+    const tipo = c.tipo || '';
+    const centro = c.centro || '';
+    const tipoDesp = c.tipoDespesa || '';
+    const subtipo = c.subtipo || '';
+    const status = c.pago ? 'Pago' : 'Pendente';
+    const key = [tipo, centro, tipoDesp, subtipo, status].join('||');
+    if (!groups[key]) groups[key] = { tipo, centro, tipoDesp, subtipo, status, total:0, count:0 };
+    groups[key].total += Number(c.valor || 0);
+    groups[key].count += 1;
+  });
+  return Object.entries(groups).map(([k,v]) => ({ key:k, ...v }));
+}
+
+function showGroups(){
+  currentGroupView = true;
+  const groups = buildGroups();
+  if (!groups.length) {
+    $('accountTable').innerHTML = '<div class="empty">Nenhum lançamento para agrupar.</div>';
+    return;
+  }
+  const html = groups.map(g => `
+    <article class="launch-card group-card" data-group="${esc(g.key)}" style="cursor:pointer;">
+      <div class="launch-header">
+        <div class="launch-title">${g.centro} — ${g.tipoDesp} / ${g.subtipo}</div>
+        <span class="badge ${g.tipo === 'P' ? 'badge-pagar' : 'badge-receber'}">${g.tipo === 'P' ? 'A pagar' : 'A receber'}</span>
+      </div>
+      <div class="launch-meta">
+        <div class="meta-row meta-row-secondary">
+          <div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">${g.status}</span></div>
+          <div class="meta-item"><span class="meta-label">Lançamentos</span><span class="meta-value">${g.count}</span></div>
+        </div>
+        <div style="margin-top:12px"><strong>Total: ${dinheiro(g.total)}</strong></div>
+      </div>
+    </article>
+  `).join('');
+  // add a back button
+  const backHtml = `<div style="margin-bottom:10px;"><button id="backGroupsBtn" class="btn secondary">Voltar</button></div>`;
+  $('accountTable').innerHTML = backHtml + html;
+  // attach handlers
+  document.querySelectorAll('.group-card').forEach(el => el.addEventListener('click', () => {
+    const k = el.dataset.group; showGroupDetail(k);
+  }));
+  const backBtn = $('backGroupsBtn'); if (backBtn) backBtn.addEventListener('click', () => { currentGroupView = false; atualizar(); });
+}
+
+function showGroupDetail(key){
+  currentGroupKey = key;
+  const parts = key.split('||');
+  const [tipo, centro, tipoDesp, subtipo, status] = parts;
+  const lista = contas.filter(c => {
+    const s = c.pago ? 'Pago' : 'Pendente';
+    return String(c.tipo || '') === tipo && String(c.centro || '') === centro && String(c.tipoDespesa || '') === tipoDesp && String(c.subtipo || '') === subtipo && s === status;
+  }).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  // show header back button
+  const backHtml = `<div style="margin-bottom:10px;"><button id="backGroupsBtn2" class="btn secondary">Voltar</button></div>`;
+  $('accountTable').innerHTML = backHtml + renderLaunchCardsHTML(lista);
+  const backBtn = $('backGroupsBtn2'); if (backBtn) backBtn.addEventListener('click', () => { showGroups(); });
+}
+
+const groupBtn = $('groupBtn');
+if (groupBtn) groupBtn.addEventListener('click', () => { mostrarLista(); showGroups(); });
 
 document.querySelectorAll('[data-target]').forEach(botao => {
   botao.addEventListener('click', () => {
