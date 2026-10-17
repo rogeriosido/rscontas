@@ -9,8 +9,12 @@ let categorias = {
 };
 
 async function fetchJson(url, options = {}) {
+  const token = localStorage.getItem('rs_token');
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options
   });
 
@@ -20,6 +24,42 @@ async function fetchJson(url, options = {}) {
   }
 
   return response.json();
+}
+
+function setAuthToken(token, user) {
+  if (token) {
+    localStorage.setItem('rs_token', token);
+    localStorage.setItem('rs_user', JSON.stringify(user || {}));
+  } else {
+    localStorage.removeItem('rs_token');
+    localStorage.removeItem('rs_user');
+  }
+}
+
+function getCurrentUser(){
+  try { return JSON.parse(localStorage.getItem('rs_user') || 'null'); } catch(e){ return null; }
+}
+
+function showAuthOverlay(tab='login'){
+  const overlay = $('authOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  $('authTitle').textContent = tab === 'login' ? 'Entrar' : 'Cadastrar';
+  $('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+  $('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  $('changePwdForm').style.display = 'none';
+}
+
+function hideAuthOverlay(){
+  const overlay = $('authOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'none';
+}
+
+async function doLogout(){
+  try { await fetchJson('/api/logout', { method: 'POST' }); } catch(e){}
+  setAuthToken(null);
+  location.reload();
 }
 
 async function carregarCategoriasApi() {
@@ -642,4 +682,73 @@ document.querySelectorAll('.tab-btn').forEach(botao => {
   });
 });
 
-inicializarDados();
+// Auth UI wiring
+const loginBtn = $('loginBtn');
+if (loginBtn) loginBtn.addEventListener('click', () => showAuthOverlay('login'));
+
+const openRegisterBtn = $('openRegisterBtn');
+if (openRegisterBtn) openRegisterBtn.addEventListener('click', () => showAuthOverlay('register'));
+const openLoginBtn = $('openLoginBtn');
+if (openLoginBtn) openLoginBtn.addEventListener('click', () => showAuthOverlay('login'));
+
+const loginForm = $('loginForm');
+if (loginForm) {
+  loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = $('loginEmail').value.trim();
+    const password = $('loginPassword').value;
+    try {
+      const res = await fetchJson('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+      setAuthToken(res.token, res.user);
+      hideAuthOverlay();
+      if (res.force_change) showAuthOverlay('change');
+      else await inicializarDados();
+    } catch (err) {
+      alert('Falha ao logar: ' + err.message);
+    }
+  });
+}
+
+const registerForm = $('registerForm');
+if (registerForm) {
+  registerForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const nome = $('regNome').value.trim();
+    const email = $('regEmail').value.trim();
+    const celular = $('regCelular').value.trim();
+    const password = $('regPassword').value;
+    try {
+      const res = await fetchJson('/api/register', { method: 'POST', body: JSON.stringify({ nome, email, celular, password }) });
+      setAuthToken(res.token, res.user);
+      hideAuthOverlay();
+      await inicializarDados();
+    } catch (err) {
+      alert('Falha ao cadastrar: ' + err.message);
+    }
+  });
+}
+
+const changePwdForm = $('changePwdForm');
+if (changePwdForm) {
+  changePwdForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const newpwd = $('newPassword').value;
+    try {
+      await fetchJson('/api/change_password', { method: 'POST', body: JSON.stringify({ new_password: newpwd }) });
+      hideAuthOverlay();
+      await inicializarDados();
+    } catch (err) {
+      alert('Falha ao trocar senha: ' + err.message);
+    }
+  });
+  const cancelBtn = $('cancelChangePwd');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => hideAuthOverlay());
+}
+
+// initialize app after auth
+const existingToken = localStorage.getItem('rs_token');
+if (existingToken) {
+  inicializarDados();
+} else {
+  showAuthOverlay('login');
+}

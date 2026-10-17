@@ -14,6 +14,9 @@
         <h1>Controle financeiro</h1>
         <p>Contas a pagar e receber</p>
       </div>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+        <button id="loginBtn" class="btn primary" type="button">Entrar / Cadastro</button>
+      </div>
     </header>
 
     <section class="dashboard screen-panel" id="dashboardScreen">
@@ -208,6 +211,49 @@
       </div>
     </section>
   </main>
+
+  <!-- Authentication overlay -->
+  <div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:1000;">
+    <div style="background:#fff;padding:20px;border-radius:8px;width:320px;max-width:95%;">
+      <h3 id="authTitle">Entrar</h3>
+      <div id="authForms">
+        <form id="loginForm">
+          <label>Email</label>
+          <input id="loginEmail" type="email" required />
+          <label>Senha</label>
+          <input id="loginPassword" type="password" required />
+          <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="openRegisterBtn" class="btn secondary">Cadastrar</button>
+            <button type="submit" class="btn primary">Entrar</button>
+          </div>
+        </form>
+
+        <form id="registerForm" style="display:none;margin-top:8px;">
+          <label>Nome</label>
+          <input id="regNome" required />
+          <label>Email</label>
+          <input id="regEmail" type="email" required />
+          <label>Celular</label>
+          <input id="regCelular" />
+          <label>Senha</label>
+          <input id="regPassword" type="password" required />
+          <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="openLoginBtn" class="btn secondary">Voltar</button>
+            <button type="submit" class="btn primary">Cadastrar</button>
+          </div>
+        </form>
+
+        <form id="changePwdForm" style="display:none;margin-top:8px;">
+          <label>Nova senha</label>
+          <input id="newPassword" type="password" required />
+          <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="cancelChangePwd" class="btn secondary">Cancelar</button>
+            <button type="submit" class="btn primary">Alterar senha</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.min.js"></script>
   <script src="js/app.js"></script>
