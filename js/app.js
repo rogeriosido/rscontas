@@ -721,15 +721,23 @@ if (loginForm) {
     e.preventDefault();
     const email = $('loginEmail').value.trim();
     const password = $('loginPassword').value;
-    try {
-      const res = await fetchJson('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      setAuthToken(res.token, res.user);
-      hideAuthOverlay();
-      if (res.force_change) showAuthOverlay('change');
-      else await inicializarDados();
-    } catch (err) {
-      alert('Falha ao logar: ' + err.message);
-    }
+      try {
+        const res = await fetchJson('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        setAuthToken(res.token, res.user);
+        // show app immediately
+        if (res.force_change) {
+          // require password change flow
+          showAuthOverlay('change');
+        } else {
+          hideAuthOverlay();
+          showApp();
+          await inicializarDados();
+        }
+      } catch (err) {
+        let msg = err.message || 'Erro ao logar';
+        try { const j = JSON.parse(msg); msg = j.error || msg; } catch(e){}
+        alert('Falha ao logar: ' + msg);
+      }
   });
 }
 
@@ -745,9 +753,12 @@ if (registerForm) {
       const res = await fetchJson('/api/register', { method: 'POST', body: JSON.stringify({ nome, email, celular, password }) });
       setAuthToken(res.token, res.user);
       hideAuthOverlay();
+      showApp();
       await inicializarDados();
     } catch (err) {
-      alert('Falha ao cadastrar: ' + err.message);
+      let msg = err.message || 'Erro ao cadastrar';
+      try { const j = JSON.parse(msg); msg = j.error || msg; } catch(e){}
+      alert('Falha ao cadastrar: ' + msg);
     }
   });
 }
@@ -760,9 +771,12 @@ if (changePwdForm) {
     try {
       await fetchJson('/api/change_password', { method: 'POST', body: JSON.stringify({ new_password: newpwd }) });
       hideAuthOverlay();
+      showApp();
       await inicializarDados();
     } catch (err) {
-      alert('Falha ao trocar senha: ' + err.message);
+      let msg = err.message || 'Erro ao trocar senha';
+      try { const j = JSON.parse(msg); msg = j.error || msg; } catch(e){}
+      alert('Falha ao trocar senha: ' + msg);
     }
   });
   const cancelBtn = $('cancelChangePwd');
