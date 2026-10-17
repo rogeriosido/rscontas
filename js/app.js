@@ -48,12 +48,24 @@ function showAuthOverlay(tab='login'){
   $('loginForm').style.display = tab === 'login' ? 'block' : 'none';
   $('registerForm').style.display = tab === 'register' ? 'block' : 'none';
   $('changePwdForm').style.display = tab === 'change' ? 'block' : 'none';
+  const pf = $('profileForm'); if (pf) pf.style.display = tab === 'profile' ? 'block' : 'none';
 }
 
 function hideAuthOverlay(){
   const overlay = $('authOverlay');
   if (!overlay) return;
   overlay.style.display = 'none';
+  // clear auth inputs
+  const le = $('loginEmail'); if (le) le.value = '';
+  const lp = $('loginPassword'); if (lp) lp.value = '';
+  const re = $('regEmail'); if (re) re.value = '';
+  const rp = $('regPassword'); if (rp) rp.value = '';
+  const rn = $('regNome'); if (rn) rn.value = '';
+  const rc = $('regCelular'); if (rc) rc.value = '';
+  const np = $('newPassword'); if (np) np.value = '';
+  const pn = $('profileNome'); if (pn) pn.value = '';
+  const pe = $('profileEmail'); if (pe) pe.value = '';
+  const pc = $('profileCelular'); if (pc) pc.value = '';
 }
 
 async function doLogout(){
@@ -69,10 +81,12 @@ function showApp(){
   if (app) app.style.display = '';
   const loginBtn = $('loginBtn'); if (loginBtn) loginBtn.style.display = 'none';
   const logoutBtn = $('logoutBtn'); if (logoutBtn) logoutBtn.style.display = '';
+  const userManageBtn = $('userManageBtn'); if (userManageBtn) userManageBtn.style.display = '';
   const user = getCurrentUser();
   const userDisplay = $('userDisplay');
   if (userDisplay) userDisplay.style.display = user ? '' : 'none';
   if (userDisplay && user) userDisplay.textContent = user.nome || user.email || '';
+  if (userManageBtn && user) userManageBtn.textContent = user.nome || user.email || 'Usuário';
 }
 
 function hideApp(){
@@ -80,6 +94,7 @@ function hideApp(){
   if (app) app.style.display = 'none';
   const loginBtn = $('loginBtn'); if (loginBtn) loginBtn.style.display = '';
   const logoutBtn = $('logoutBtn'); if (logoutBtn) logoutBtn.style.display = 'none';
+  const userManageBtn = $('userManageBtn'); if (userManageBtn) { userManageBtn.style.display = 'none'; userManageBtn.textContent = 'Usuário'; }
   const userDisplay = $('userDisplay'); if (userDisplay) { userDisplay.style.display = 'none'; userDisplay.textContent = ''; }
 }
 
@@ -710,6 +725,20 @@ if (loginBtn) loginBtn.addEventListener('click', () => showAuthOverlay('login'))
 const logoutBtn = $('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', async () => { await doLogout(); });
 
+// user/profile button inside Cadastros
+const userManageBtn = $('userManageBtn');
+if (userManageBtn) userManageBtn.addEventListener('click', async () => {
+  showAuthOverlay('profile');
+  try {
+    const me = await fetchJson('/api/me');
+    const pn = $('profileNome'); if (pn) pn.value = me.nome || '';
+    const pe = $('profileEmail'); if (pe) pe.value = me.email || '';
+    const pc = $('profileCelular'); if (pc) pc.value = me.celular || '';
+  } catch (e) {
+    alert('Erro ao carregar perfil');
+  }
+});
+
 const openRegisterBtn = $('openRegisterBtn');
 if (openRegisterBtn) openRegisterBtn.addEventListener('click', () => showAuthOverlay('register'));
 const openLoginBtn = $('openLoginBtn');
@@ -781,6 +810,33 @@ if (changePwdForm) {
   });
   const cancelBtn = $('cancelChangePwd');
   if (cancelBtn) cancelBtn.addEventListener('click', () => hideAuthOverlay());
+}
+
+// profile form handlers
+const profileForm = $('profileForm');
+if (profileForm) {
+  profileForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const nome = $('profileNome').value.trim();
+    const email = $('profileEmail').value.trim();
+    const celular = $('profileCelular').value.trim();
+    try {
+      await fetchJson('/api/me', { method: 'PUT', body: JSON.stringify({ nome, email, celular }) });
+      // update local user
+      const token = localStorage.getItem('rs_token');
+      const user = getCurrentUser() || {};
+      user.nome = nome; user.email = email; user.celular = celular;
+      setAuthToken(token, user);
+      hideAuthOverlay();
+      showApp();
+    } catch (err) {
+      let msg = 'Erro ao salvar perfil';
+      try { const j = JSON.parse(err.message || ''); msg = j.error || msg; } catch(e) { msg = err.message || msg; }
+      alert(msg);
+    }
+  });
+  const profileChange = $('profileChangePwd');
+  if (profileChange) profileChange.addEventListener('click', () => showAuthOverlay('change'));
 }
 
 // initialize app after auth

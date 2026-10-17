@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#111827">
   <title>RS Contas</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/custom.css">
 </head>
 <body>
   <main id="appContainer" class="main" style="display:none;">
@@ -17,7 +18,7 @@
       <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
         <span id="userDisplay" style="display:none;margin-right:8px;"></span>
         <button id="loginBtn" class="btn primary" type="button">Entrar / Cadastro</button>
-        <button id="logoutBtn" class="btn secondary" type="button" style="display:none;">Sair</button>
+        <button id="logoutBtn" class="btn secondary" type="button" style="display:none;margin-left:8px;">Sair</button>
       </div>
     </header>
 
@@ -180,10 +181,15 @@
         <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
       </div>
 
-      <div class="management-tabs">
-        <button class="tab-btn active" type="button" data-tab="centros">Centro de custo</button>
-        <button class="tab-btn" type="button" data-tab="tipos">Tipo de despesa</button>
-        <button class="tab-btn" type="button" data-tab="subtipos">Subtipo de despesa</button>
+      <div class="management-header">
+        <div class="management-tabs">
+          <button class="tab-btn active" type="button" data-tab="centros">Centro de custo</button>
+          <button class="tab-btn" type="button" data-tab="tipos">Tipo de despesa</button>
+          <button class="tab-btn" type="button" data-tab="subtipos">Subtipo de despesa</button>
+        </div>
+        <div style="min-width:120px;display:flex;justify-content:flex-end;">
+          <button id="userManageBtn" class="tab-btn" type="button" style="display:none;">Usuário</button>
+        </div>
       </div>
 
       <div class="management-content">
@@ -251,6 +257,19 @@
           <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
             <button type="button" id="cancelChangePwd" class="btn secondary">Cancelar</button>
             <button type="submit" class="btn primary">Alterar senha</button>
+          </div>
+        </form>
+      
+        <form id="profileForm" style="display:none;margin-top:8px;">
+          <label>Nome</label>
+          <input id="profileNome" />
+          <label>Email</label>
+          <input id="profileEmail" type="email" />
+          <label>Celular</label>
+          <input id="profileCelular" />
+          <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="profileChangePwd" class="btn secondary">Trocar senha</button>
+            <button type="submit" class="btn primary">Salvar</button>
           </div>
         </form>
       </div>
