@@ -5,7 +5,8 @@ let contas = [];
 let categorias = {
   centros: [],
   tipos: [],
-  subtipos: []
+  subtipos: [],
+  pagamentos: []
 };
 
 async function fetchJson(url, options = {}) {
@@ -104,12 +105,13 @@ async function carregarCategoriasApi() {
     categorias = {
       centros: Array.isArray(dados.centros) ? dados.centros : [],
       tipos: Array.isArray(dados.tipos) ? dados.tipos : [],
-      subtipos: Array.isArray(dados.subtipos) ? dados.subtipos : []
+      subtipos: Array.isArray(dados.subtipos) ? dados.subtipos : [],
+      pagamentos: Array.isArray(dados.pagamentos) ? dados.pagamentos : []
     };
     return categorias;
   } catch (error) {
     console.warn('Erro ao carregar categorias do backend:', error);
-    categorias = { centros: [], tipos: [], subtipos: [] };
+    categorias = { centros: [], tipos: [], subtipos: [], pagamentos: [] };
     return categorias;
   }
 }
@@ -255,12 +257,14 @@ function preencherOpcoesCategorias(){
   atualizarSelect($('centroCusto'), categorias.centros, '');
   atualizarSelect($('tipoDespesa'), categorias.tipos, '');
   atualizarSelect($('subtipoDespesa'), categorias.subtipos, '');
+  const pagamentoSel = $('pagamento'); if (pagamentoSel) atualizarSelect(pagamentoSel, categorias.pagamentos, '');
 }
 
 function renderizarCategorias(){
   renderizarLista('centroList', categorias.centros, 'centros');
   renderizarLista('tipoList', categorias.tipos, 'tipos');
   renderizarLista('subtipoList', categorias.subtipos, 'subtipos');
+  renderizarLista('pagamentoList', categorias.pagamentos, 'pagamentos');
 }
 
 function renderizarLista(containerId, itens, tipo){
@@ -370,6 +374,7 @@ function abrirForm(conta = null){
   $('centroCusto').value = conta?.centro || categorias.centros[0] || '';
   $('tipoDespesa').value = conta?.tipoDespesa || categorias.tipos[0] || '';
   $('subtipoDespesa').value = conta?.subtipo || categorias.subtipos[0] || '';
+  const pagamentoSel = $('pagamento'); if (pagamentoSel) pagamentoSel.value = conta?.pagamento || categorias.pagamentos[0] || '';
   $('valor').value = conta ? String(conta.valor).replace('.', ',') : '';
   const dataAtual = conta?.data || new Date().toISOString().slice(0, 10);
   $('data').value = formataDataTexto(dataAtual);
@@ -420,6 +425,7 @@ if (form) {
       centro: $('centroCusto').value,
       tipoDespesa: $('tipoDespesa').value,
       subtipo: $('subtipoDespesa').value,
+      pagamento: $('pagamento') ? $('pagamento').value : '',
       valor: numero($('valor').value),
       data: dataISO($('data').value || $('dataNative').value),
       pago: $('pago').checked,
@@ -524,6 +530,8 @@ function renderLaunchCardsHTML(lista){
 
         ${c.obs ? `<div class="meta-item"><span class="meta-label">Obs.</span><span class="meta-value">${esc(c.obs)}</span></div>` : ''}
       </div>
+
+      ${c.pagamento ? `<div class="meta-item"><span class="meta-label">Pagamento</span><span class="meta-value">${esc(c.pagamento)}</span></div>` : ''}
 
       <div class="launch-footer">
         <div class="actions">
@@ -777,6 +785,16 @@ if (subtipoForm) {
     await adicionarCategoria('subtipos', $('novoSubtipo').value);
     $('novoSubtipo').value = '';
     $('novoSubtipo').focus();
+  });
+}
+
+const pagamentoForm = $('pagamentoForm');
+if (pagamentoForm) {
+  pagamentoForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    await adicionarCategoria('pagamentos', $('novoPagamento').value);
+    $('novoPagamento').value = '';
+    $('novoPagamento').focus();
   });
 }
 

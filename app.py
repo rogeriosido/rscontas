@@ -59,6 +59,7 @@ def init_db():
             centro TEXT,
             tipoDespesa TEXT,
             subtipo TEXT,
+            pagamento TEXT,
             valor REAL,
             user_id TEXT,
             data TEXT,
@@ -93,6 +94,18 @@ def init_db():
         """
     )
     conn.commit()
+    # after creation, ensure legacy DBs get the new user_id column if missing
+    # check contas
+    cols = [r[1] for r in conn.execute("PRAGMA table_info('contas')").fetchall()]
+    if 'user_id' not in cols:
+        conn.execute("ALTER TABLE contas ADD COLUMN user_id TEXT")
+        conn.execute("UPDATE contas SET user_id = ?", ("admin",))
+    # check categorias
+    cols2 = [r[1] for r in conn.execute("PRAGMA table_info('categorias')").fetchall()]
+    if 'user_id' not in cols2:
+        conn.execute("ALTER TABLE categorias ADD COLUMN user_id TEXT")
+        conn.execute("UPDATE categorias SET user_id = ?", ("admin",))
+    conn.commit()
     conn.close()
     # create default admin user if no users exist
     conn = get_db_connection()
@@ -126,6 +139,14 @@ def get_categorias_from_db(user_id=None):
             estrutura["tipos"].append(row["valor"])
         elif row["grupo"] == "subtipos":
             estrutura["subtipos"].append(row["valor"])
+        elif row["grupo"] == "pagamentos":
+            # allow additional group pagamentos
+            if "pagamentos" not in estrutura:
+                estrutura["pagamentos"] = []
+            estrutura["pagamentos"].append(row["valor"])
+    # ensure pagamentos key exists
+    if "pagamentos" not in estrutura:
+        estrutura["pagamentos"] = []
     return estrutura
 
 
@@ -160,6 +181,7 @@ def get_contas_from_db(user_id=None):
                 "centro": row["centro"],
                 "tipoDespesa": row["tipoDespesa"],
                 "subtipo": row["subtipo"],
+                "pagamento": row["pagamento"] if "pagamento" in row.keys() else "",
                 "valor": float(row["valor"] or 0),
                 "data": row["data"],
                 "pago": bool(row["pago"]),
@@ -181,6 +203,7 @@ def normalize_conta(payload):
         "centro": payload.get("centro") or "",
         "tipoDespesa": payload.get("tipoDespesa") or "",
         "subtipo": payload.get("subtipo") or "",
+        "pagamento": payload.get("pagamento") or "",
         "valor": float(payload.get("valor") or 0),
         "data": payload.get("data") or "",
         "pago": bool(payload.get("pago")) ,
@@ -282,6 +305,7 @@ def api_save_conta():
             centro = excluded.centro,
             tipoDespesa = excluded.tipoDespesa,
             subtipo = excluded.subtipo,
+            pagamento = excluded.pagamento,
             valor = excluded.valor,
             data = excluded.data,
             pago = excluded.pago,
@@ -295,6 +319,7 @@ def api_save_conta():
             conta["centro"],
             conta["tipoDespesa"],
             conta["subtipo"],
+            conta.get("pagamento", ""),
             conta["valor"],
             user["id"],
             conta["data"],
@@ -341,6 +366,7 @@ def api_update_conta(id):
             centro = ?,
             tipoDespesa = ?,
             subtipo = ?,
+            pagamento = ?,
             valor = ?,
             data = ?,
             pago = ?,
@@ -354,6 +380,7 @@ def api_update_conta(id):
             conta["centro"],
             conta["tipoDespesa"],
             conta["subtipo"],
+            conta.get("pagamento", ""),
             conta["valor"],
             conta["data"],
             int(conta["pago"]),
@@ -460,6 +487,41 @@ def api_change_password():
     conn = get_db_connection()
     conn.execute('UPDATE users SET password_hash = ?, force_change = 0 WHERE id = ?', (pwd_hash, user['id']))
     conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/me', methods=['GET'])
+def api_get_me():
+    user = _require_user(request)
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    row = conn.execute('SELECT id, email, nome, celular FROM users WHERE id = ?', (user['id'],)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({'id': row['id'], 'email': row['email'], 'nome': row['nome'], 'celular': row['celular']})
+
+
+@app.route('/api/me', methods=['PUT'])
+def api_update_me():
+    user = _require_user(request)
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    nome = str(data.get('nome') or '').strip()
+    email = str(data.get('email') or '').strip()
+    celular = str(data.get('celular') or '').strip()
+    if not email:
+        return jsonify({'error': 'Email obrigatório'}), 400
+    conn = get_db_connection()
+    try:
+        conn.execute('UPDATE users SET nome = ?, email = ?, celular = ? WHERE id = ?', (nome, email, celular, user['id']))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'error': 'Email já em uso'}), 400
     conn.close()
     return jsonify({'ok': True})
 
