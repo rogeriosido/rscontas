@@ -1,7 +1,11 @@
-node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
 .env
 .env.*
-npm-debug.log*
 .DS_Store
 coverage/
-README.txt
+*.log
