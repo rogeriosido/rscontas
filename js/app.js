@@ -628,8 +628,10 @@ function showGroupDetail(key){
   const backBtn = $('backGroupsBtn2'); if (backBtn) backBtn.addEventListener('click', () => { showGroups(); });
 }
 
-const groupBtn = $('groupBtn');
-if (groupBtn) groupBtn.addEventListener('click', () => { mostrarLista(); showGroups(); });
+['groupBtn','dashboardGroupBtn'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('click', () => { mostrarLista(); showGroups(); });
+});
 
 document.querySelectorAll('[data-target]').forEach(botao => {
   botao.addEventListener('click', () => {
