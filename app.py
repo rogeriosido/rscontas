@@ -100,6 +100,11 @@ def init_db():
     if 'user_id' not in cols:
         conn.execute("ALTER TABLE contas ADD COLUMN user_id TEXT")
         conn.execute("UPDATE contas SET user_id = ?", ("admin",))
+    # add pagamento column for older DBs
+    cols = [r[1] for r in conn.execute("PRAGMA table_info('contas')").fetchall()]
+    if 'pagamento' not in cols:
+        conn.execute("ALTER TABLE contas ADD COLUMN pagamento TEXT")
+        conn.execute("UPDATE contas SET pagamento = ?", ("",))
     # check categorias
     cols2 = [r[1] for r in conn.execute("PRAGMA table_info('categorias')").fetchall()]
     if 'user_id' not in cols2:
