@@ -44,10 +44,10 @@ function showAuthOverlay(tab='login'){
   const overlay = $('authOverlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  $('authTitle').textContent = tab === 'login' ? 'Entrar' : 'Cadastrar';
+  $('authTitle').textContent = tab === 'login' ? 'Entrar' : (tab === 'register' ? 'Cadastrar' : 'Alterar senha');
   $('loginForm').style.display = tab === 'login' ? 'block' : 'none';
   $('registerForm').style.display = tab === 'register' ? 'block' : 'none';
-  $('changePwdForm').style.display = 'none';
+  $('changePwdForm').style.display = tab === 'change' ? 'block' : 'none';
 }
 
 function hideAuthOverlay(){
@@ -59,7 +59,28 @@ function hideAuthOverlay(){
 async function doLogout(){
   try { await fetchJson('/api/logout', { method: 'POST' }); } catch(e){}
   setAuthToken(null);
-  location.reload();
+  hideApp();
+  showAuthOverlay('login');
+}
+
+
+function showApp(){
+  const app = $('appContainer');
+  if (app) app.style.display = '';
+  const loginBtn = $('loginBtn'); if (loginBtn) loginBtn.style.display = 'none';
+  const logoutBtn = $('logoutBtn'); if (logoutBtn) logoutBtn.style.display = '';
+  const user = getCurrentUser();
+  const userDisplay = $('userDisplay');
+  if (userDisplay) userDisplay.style.display = user ? '' : 'none';
+  if (userDisplay && user) userDisplay.textContent = user.nome || user.email || '';
+}
+
+function hideApp(){
+  const app = $('appContainer');
+  if (app) app.style.display = 'none';
+  const loginBtn = $('loginBtn'); if (loginBtn) loginBtn.style.display = '';
+  const logoutBtn = $('logoutBtn'); if (logoutBtn) logoutBtn.style.display = 'none';
+  const userDisplay = $('userDisplay'); if (userDisplay) { userDisplay.style.display = 'none'; userDisplay.textContent = ''; }
 }
 
 async function carregarCategoriasApi() {
@@ -686,6 +707,9 @@ document.querySelectorAll('.tab-btn').forEach(botao => {
 const loginBtn = $('loginBtn');
 if (loginBtn) loginBtn.addEventListener('click', () => showAuthOverlay('login'));
 
+const logoutBtn = $('logoutBtn');
+if (logoutBtn) logoutBtn.addEventListener('click', async () => { await doLogout(); });
+
 const openRegisterBtn = $('openRegisterBtn');
 if (openRegisterBtn) openRegisterBtn.addEventListener('click', () => showAuthOverlay('register'));
 const openLoginBtn = $('openLoginBtn');
@@ -748,7 +772,9 @@ if (changePwdForm) {
 // initialize app after auth
 const existingToken = localStorage.getItem('rs_token');
 if (existingToken) {
+  showApp();
   inicializarDados();
 } else {
+  hideApp();
   showAuthOverlay('login');
 }

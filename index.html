@@ -8,14 +8,16 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main class="main">
+  <main id="appContainer" class="main" style="display:none;">
     <header class="topbar">
       <div>
         <h1>Controle financeiro</h1>
         <p>Contas a pagar e receber</p>
       </div>
       <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+        <span id="userDisplay" style="display:none;margin-right:8px;"></span>
         <button id="loginBtn" class="btn primary" type="button">Entrar / Cadastro</button>
+        <button id="logoutBtn" class="btn secondary" type="button" style="display:none;">Sair</button>
       </div>
     </header>
 
