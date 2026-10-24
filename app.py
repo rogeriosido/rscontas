@@ -160,7 +160,7 @@ def get_contas_from_db(user_id=None):
     if user_id:
         rows = conn.execute(
             """
-            SELECT id, titulo, tipo, centro, tipoDespesa, subtipo, valor, data, pago, obs, atualizadoEm
+            SELECT id, titulo, tipo, centro, tipoDespesa, subtipo, pagamento, valor, data, pago, obs, atualizadoEm
             FROM contas WHERE user_id = ?
             ORDER BY data DESC, atualizadoEm DESC
             """,
@@ -169,7 +169,7 @@ def get_contas_from_db(user_id=None):
     else:
         rows = conn.execute(
             """
-            SELECT id, titulo, tipo, centro, tipoDespesa, subtipo, valor, data, pago, obs, atualizadoEm
+            SELECT id, titulo, tipo, centro, tipoDespesa, subtipo, pagamento, valor, data, pago, obs, atualizadoEm
             FROM contas
             ORDER BY data DESC, atualizadoEm DESC
             """

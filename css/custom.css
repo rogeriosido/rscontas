@@ -19,6 +19,28 @@
 .management-header .management-tabs .tab-btn { background:#f8fafc; border:1px solid #dfe3e8; color:#374151 }
 .management-header .management-tabs .tab-btn.active { background:#111827; color:#fff; border-color:#111827 }
 
+/* Keep account form fields in the requested pairs. */
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.form-grid .span-3{grid-column:1/-1}
+
+.launch-badges{display:flex;align-items:flex-start;justify-content:flex-end;gap:4px;flex-wrap:wrap}
+.payment-actions-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;min-width:0}
+.payment-actions-row .meta-item{min-width:0}
+.payment-actions-row .meta-value{overflow-wrap:anywhere;word-break:normal}
+.payment-actions-row .actions{justify-self:end;flex:0 0 auto}
+.payment-actions-row .actions button{flex:0 0 auto}
+.launch-card .meta-row .meta-item:nth-child(2){align-items:flex-end;text-align:right}
+.launch-card .meta-row .meta-item:nth-child(2) .meta-value{ text-align:right }
+.launch-status{width:100%;margin-top:auto}
+.launch-status .badge{display:block;width:100%}
+.type-card-heading{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;width:100%}
+.type-card-heading .type-title,.type-card-heading .type-total{font-size:15px!important;line-height:1.2;margin:0!important;white-space:nowrap}
+.type-card{min-height:150px;padding:14px 12px}
+.type-subgroup{margin-top:10px;padding-top:8px}
+.cards-duplas{gap:8px;margin-bottom:6px}
+@media(max-width:700px){.type-card-heading .type-title,.type-card-heading .type-total{font-size:14px!important}}
+@media(max-width:430px){.type-card-heading .type-title,.type-card-heading .type-total{font-size:13px!important}}
+
 
 /* On wider screens, show buttons in a single row (up to 4 in a line) */
 @media (min-width:700px){

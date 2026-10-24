@@ -6,14 +6,13 @@
   <meta name="theme-color" content="#111827">
   <title>RS Contas</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/custom.css?v=20261018-2">
 </head>
 <body>
   <main id="appContainer" class="main" style="display:none;">
     <header class="topbar">
       <div>
         <h1>Controle financeiro</h1>
-        <p>Contas a pagar e receber</p>
       </div>
       <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
         <span id="userDisplay" style="display:none;margin-right:8px;"></span>
@@ -34,9 +33,14 @@
           <span class="card-title">Lançamentos</span>
         </button>
 
-        <button id="dashboardGroupBtn" class="action-card secondary-card" type="button" data-target="listPanel" data-title="Agrupamento">
+        <button id="dashboardGroupBtn" class="action-card secondary-card" type="button" data-title="Agrupamento">
           <span class="card-icon">🔀</span>
           <span class="card-title">Agrupamento</span>
+        </button>
+
+        <button id="dashboardGroup2Btn" class="action-card secondary-card" type="button">
+          <span class="card-icon">∑</span>
+          <span class="card-title">Agrupamento 2</span>
         </button>
 
         <button id="managementBtn" class="action-card secondary-card" type="button" data-target="managementPanel" data-title="Cadastros">
@@ -47,8 +51,10 @@
 
       <div class="cards cards-duplas">
         <article class="type-card pay-card">
-          <div class="type-title red">A pagar</div>
-          <div class="type-total red" id="totalPagar">R$ 0,00</div>
+          <div class="type-card-heading">
+            <div class="type-title red">A pagar</div>
+            <div class="type-total red" id="totalPagar">R$ 0,00</div>
+          </div>
 
           <div class="type-subgroup">
             <div class="type-line">
@@ -63,8 +69,10 @@
         </article>
 
         <article class="type-card receive-card">
-          <div class="type-title green">A receber</div>
-          <div class="type-total green" id="totalReceber">R$ 0,00</div>
+          <div class="type-card-heading">
+            <div class="type-title green">A receber</div>
+            <div class="type-total green" id="totalReceber">R$ 0,00</div>
+          </div>
 
           <div class="type-subgroup">
             <div class="type-line">
@@ -93,6 +101,11 @@
         <input type="hidden" id="accountId">
         <div class="form-grid">
           <div class="field span-2">
+            <label for="lancamentoMesAno">Mês/Ano *</label>
+            <select id="lancamentoMesAno" required></select>
+          </div>
+
+          <div class="field span-2">
             <label for="titulo">Título</label>
             <input id="titulo" maxlength="120" placeholder="Ex.: Conta de energia">
           </div>
@@ -103,6 +116,13 @@
               <option value="">Selecione</option>
               <option value="P">Pagar</option>
               <option value="R">Receber</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pagamento">Pagamento</label>
+            <select id="pagamento">
+              <option value="">Selecione</option>
             </select>
           </div>
 
@@ -123,13 +143,6 @@
           <div class="field">
             <label for="subtipoDespesa">Subtipo de despesa *</label>
             <select id="subtipoDespesa" required>
-              <option value="">Selecione</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="pagamento">Pagamento</label>
-            <select id="pagamento">
               <option value="">Selecione</option>
             </select>
           </div>
@@ -176,6 +189,7 @@
         <div class="filters">
           <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
           <input id="search" class="search" placeholder="🔎 Pesquisar título...">
+          <select id="filterMesAno"><option value="">Todos os meses</option></select>
           <select id="filterType"><option value="">Todos</option><option value="P">A pagar</option><option value="R">A receber</option></select>
           <select id="filterStatus"><option value="">Todos</option><option value="pendente">Pendentes</option><option value="pago">Pagos</option></select>
           <!-- Agrupamento moved to dashboard quick-actions -->

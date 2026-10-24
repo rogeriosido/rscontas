@@ -364,6 +364,42 @@ function dataISO(data){
   return valor;
 }
 
+function sincronizarPeriodoComData(data){
+  const iso = dataISO(data);
+  const partes = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!partes) return;
+
+  const mesAnoSelect = $('lancamentoMesAno');
+  if (!mesAnoSelect) return;
+
+  const mesAno = `${partes[1]}-${partes[2]}`;
+  if (![...mesAnoSelect.options].some(opcao => opcao.value === mesAno)) {
+    const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const opcao = document.createElement('option');
+    opcao.value = mesAno;
+    opcao.textContent = `${nomesMeses[Number(partes[2]) - 1]} ${partes[1]}`;
+    mesAnoSelect.appendChild(opcao);
+  }
+  mesAnoSelect.value = mesAno;
+}
+
+function sincronizarDataComPeriodo(){
+  const mesAno = $('lancamentoMesAno')?.value || '';
+  const periodo = mesAno.match(/^(\d{4})-(\d{2})$/);
+  if (!periodo) return;
+  const ano = Number(periodo[1]);
+  const mes = Number(periodo[2]);
+
+  const isoAtual = dataISO($('data').value || $('dataNative').value);
+  const partes = isoAtual.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const diaAtual = partes ? Number(partes[2]) : 1;
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  const dia = String(Math.min(diaAtual, ultimoDia)).padStart(2, '0');
+  const iso = `${ano}-${String(mes).padStart(2, '0')}-${dia}`;
+  $('data').value = formataDataTexto(iso);
+  $('dataNative').value = iso;
+}
+
 function abrirForm(conta = null){
   $('formPanel').classList.remove('hidden');
   $('formTitle').textContent = conta ? 'Editar conta' : 'Nova conta';
@@ -379,6 +415,17 @@ function abrirForm(conta = null){
   const dataAtual = conta?.data || new Date().toISOString().slice(0, 10);
   $('data').value = formataDataTexto(dataAtual);
   $('dataNative').value = dataAtual;
+  const mesAnoSelect = $('lancamentoMesAno');
+  if (mesAnoSelect) {
+    const anoAtual = new Date().getFullYear();
+    const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    mesAnoSelect.innerHTML = Array.from({ length: 21 }, (_, indice) => anoAtual - 10 + indice)
+      .flatMap(ano => nomesMeses.map((nomeMes, indiceMes) => {
+        const mes = String(indiceMes + 1).padStart(2, '0');
+        return `<option value="${ano}-${mes}">${nomeMes} ${ano}</option>`;
+      })).join('');
+    sincronizarPeriodoComData(dataAtual);
+  }
   $('pago').checked = !!conta?.pago;
   $('obs').value = conta?.obs || '';
   $('titulo').focus();
@@ -449,12 +496,29 @@ if (form) {
 function atualizar(){
   const busca = $('search').value.toLowerCase().trim();
   const tipo = $('filterType').value;
+  const filtroMesAno = $('filterMesAno');
+  const mesAnoSelecionado = filtroMesAno?.value || '';
+  const periodos = [...new Set(contas.map(c => {
+    const data = dataISO(c.data);
+    return /^\d{4}-\d{2}-\d{2}$/.test(data) ? data.slice(0, 7) : '';
+  }).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  if (filtroMesAno) {
+    const nomesMeses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    filtroMesAno.innerHTML = '<option value="">Todos os meses</option>' + periodos.map(periodo => {
+      const [ano, mes] = periodo.split('-');
+      const nomeMes = nomesMeses[Number(mes) - 1];
+      return `<option value="${periodo}">${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} ${ano}</option>`;
+    }).join('');
+    filtroMesAno.value = periodos.includes(mesAnoSelecionado) ? mesAnoSelecionado : '';
+  }
   const status = $('filterStatus').value;
   const lista = contas.filter(c => {
+    const data = dataISO(c.data);
     const okBusca = !busca || `${c.titulo} ${c.centro} ${c.tipoDespesa} ${c.subtipo}`.toLowerCase().includes(busca);
     const okTipo = !tipo || c.tipo === tipo;
+    const okMesAno = !mesAnoSelecionado || data.startsWith(`${mesAnoSelecionado}-`);
     const okStatus = !status || (status === 'pago' ? c.pago : !c.pago);
-    return okBusca && okTipo && okStatus;
+    return okBusca && okTipo && okMesAno && okStatus;
   }).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
 
   $('accountTable').innerHTML = renderLaunchCardsHTML(lista);
@@ -502,7 +566,9 @@ function renderLaunchCardsHTML(lista){
     <article class="launch-card" data-id="${c.id}">
       <div class="launch-header">
         <div class="launch-title">${esc(c.titulo)}</div>
-        <span class="badge ${c.tipo === 'P' ? 'badge-pagar' : 'badge-receber'}">${c.tipo === 'P' ? 'A pagar' : 'A receber'}</span>
+        <div class="launch-badges">
+          <span class="badge ${c.tipo === 'P' ? 'badge-pagar' : 'badge-receber'}">${c.tipo === 'P' ? 'A pagar' : 'A receber'}</span>
+        </div>
       </div>
 
       <div class="launch-meta">
@@ -528,20 +594,18 @@ function renderLaunchCardsHTML(lista){
           </div>
         </div>
 
+        <div class="payment-actions-row">
+          <div class="meta-item">
+            ${c.pagamento ? `<span class="meta-label">Pagamento</span><span class="meta-value">${esc(c.pagamento)}</span>` : ''}
+          </div>
+          <div class="actions">
+            <button class="edit" onclick="editar('${c.id}')">Editar</button>
+            <button class="delete" onclick="excluir('${c.id}')">Excluir</button>
+          </div>
+        </div>
         ${c.obs ? `<div class="meta-item"><span class="meta-label">Obs.</span><span class="meta-value">${esc(c.obs)}</span></div>` : ''}
       </div>
-
-      ${c.pagamento ? `<div class="meta-item"><span class="meta-label">Pagamento</span><span class="meta-value">${esc(c.pagamento)}</span></div>` : ''}
-
-      <div class="launch-footer">
-        <div class="actions">
-          <button class="edit" onclick="editar('${c.id}')">Editar</button>
-          <button class="delete" onclick="excluir('${c.id}')">Excluir</button>
-        </div>
-      </div>
-
-      <div class="meta-item">
-        <span class="meta-label">Status</span>
+      <div class="launch-status">
         <span class="badge ${c.pago ? 'badge-pago' : 'badge-pendente'}">${c.pago ? 'Pago' : 'Pendente'}</span>
       </div>
     </article>`).join('');
@@ -549,6 +613,7 @@ function renderLaunchCardsHTML(lista){
 
 const mostrarLista = () => {
   mostrarTela('listPanel');
+  atualizar();
   listPanelScroll();
 };
 
@@ -565,9 +630,11 @@ bindIfExists('cancelBtn', fecharForm);
 
 const searchInput = $('search');
 const filterType = $('filterType');
+const filterMesAno = $('filterMesAno');
 const filterStatus = $('filterStatus');
 if (searchInput) searchInput.addEventListener('input', atualizar);
 if (filterType) filterType.addEventListener('change', atualizar);
+if (filterMesAno) filterMesAno.addEventListener('change', atualizar);
 if (filterStatus) filterStatus.addEventListener('change', atualizar);
 
 // Grouping feature
@@ -575,19 +642,21 @@ let currentGroupView = false;
 let currentGroupKey = null;
 
 function buildGroups(){
-  const groups = {}; // key -> {keyParts, total, count}
+  const groups = new Map();
   contas.forEach(c => {
     const tipo = c.tipo || '';
+    const pagamento = String(c.pagamento || '').trim();
     const centro = c.centro || '';
     const tipoDesp = c.tipoDespesa || '';
     const subtipo = c.subtipo || '';
-    const status = c.pago ? 'Pago' : 'Pendente';
-    const key = [tipo, centro, tipoDesp, subtipo, status].join('||');
-    if (!groups[key]) groups[key] = { tipo, centro, tipoDesp, subtipo, status, total:0, count:0 };
-    groups[key].total += Number(c.valor || 0);
-    groups[key].count += 1;
+    const key = JSON.stringify([tipo, pagamento, centro, tipoDesp, subtipo]);
+    if (!groups.has(key)) groups.set(key, { key, tipo, pagamento, centro, tipoDesp, subtipo, total: 0 });
+    groups.get(key).total += Number(c.valor || 0);
   });
-  return Object.entries(groups).map(([k,v]) => ({ key:k, ...v }));
+  return [...groups.values()].sort((a, b) =>
+    [a.tipo, a.pagamento, a.centro, a.tipoDesp, a.subtipo]
+      .join(' ').localeCompare([b.tipo, b.pagamento, b.centro, b.tipoDesp, b.subtipo].join(' '), 'pt-BR')
+  );
 }
 
 function showGroups(){
@@ -600,15 +669,19 @@ function showGroups(){
   const html = groups.map(g => `
     <article class="launch-card group-card" data-group="${esc(g.key)}" style="cursor:pointer;">
       <div class="launch-header">
-        <div class="launch-title">${g.centro} — ${g.tipoDesp} / ${g.subtipo}</div>
+        <div class="launch-title">${esc(g.tipoDesp || 'Sem tipo')} / ${esc(g.subtipo || 'Sem subtipo')}</div>
         <span class="badge ${g.tipo === 'P' ? 'badge-pagar' : 'badge-receber'}">${g.tipo === 'P' ? 'A pagar' : 'A receber'}</span>
       </div>
       <div class="launch-meta">
-        <div class="meta-row meta-row-secondary">
-          <div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">${g.status}</span></div>
-          <div class="meta-item"><span class="meta-label">Lançamentos</span><span class="meta-value">${g.count}</span></div>
+        <div class="meta-row">
+          <div class="meta-item"><span class="meta-label">Pagamento</span><span class="meta-value">${esc(g.pagamento || 'Sem pagamento')}</span></div>
+          <div class="meta-item"><span class="meta-label">Tipo de despesa</span><span class="meta-value">${esc(g.tipoDesp || 'Sem tipo')}</span></div>
         </div>
-        <div style="margin-top:12px"><strong>Total: ${dinheiro(g.total)}</strong></div>
+        <div class="meta-row">
+          <div class="meta-item"><span class="meta-label">Centro de custo</span><span class="meta-value">${esc(g.centro || 'Sem centro de custo')}</span></div>
+          <div class="meta-item"><span class="meta-label">Subtipo</span><span class="meta-value">${esc(g.subtipo || 'Sem subtipo')}</span></div>
+        </div>
+        <div style="margin-top:8px"><strong>Total: ${dinheiro(g.total)}</strong></div>
       </div>
     </article>
   `).join('');
@@ -622,13 +695,125 @@ function showGroups(){
   const backBtn = $('backGroupsBtn'); if (backBtn) backBtn.addEventListener('click', () => { currentGroupView = false; atualizar(); });
 }
 
+function showTotalsByType(){
+  const entries = ['P', 'R'].map(tipo => ({
+    value: tipo,
+    label: tipo === 'P' ? 'A pagar' : 'A receber',
+    total: contas.filter(c => c.tipo === tipo).reduce((soma, c) => soma + Number(c.valor || 0), 0)
+  }));
+  renderGroup2Totals('Totais por tipo', entries, tipo => showTotalsByPayment(tipo));
+}
+
+function showTotalsByPayment(tipo){
+  const pagamentos = new Map();
+  contas.filter(c => c.tipo === tipo).forEach(c => {
+    const pagamento = String(c.pagamento || '').trim();
+    pagamentos.set(pagamento, (pagamentos.get(pagamento) || 0) + Number(c.valor || 0));
+  });
+
+  const entries = [...pagamentos.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    .map(([pagamento, total]) => ({ value: pagamento, label: pagamento || 'Sem pagamento', total }));
+  const rotuloTipo = tipo === 'P' ? 'A pagar' : 'A receber';
+  renderGroup2Totals(`${rotuloTipo} / pagamento`, entries,
+    pagamento => showTotalsByCenter(tipo, pagamento), showTotalsByType);
+}
+
+function showTotalsByCenter(tipo, pagamento){
+  const centros = new Map();
+  contas.filter(c => c.tipo === tipo && String(c.pagamento || '').trim() === pagamento).forEach(c => {
+    const centro = String(c.centro || '').trim();
+    centros.set(centro, (centros.get(centro) || 0) + Number(c.valor || 0));
+  });
+  const entries = [...centros.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    .map(([centro, total]) => ({ value: centro, label: centro || 'Sem centro de custo', total }));
+  renderGroup2Totals('Centro de custo', entries,
+    centro => showTotalsByExpenseType(tipo, pagamento, centro),
+    () => showTotalsByPayment(tipo));
+}
+
+function showTotalsByExpenseType(tipo, pagamento, centro){
+  const tiposDespesa = new Map();
+  contas.filter(c => c.tipo === tipo && String(c.pagamento || '').trim() === pagamento && String(c.centro || '').trim() === centro).forEach(c => {
+    const tipoDespesa = String(c.tipoDespesa || '').trim();
+    tiposDespesa.set(tipoDespesa, (tiposDespesa.get(tipoDespesa) || 0) + Number(c.valor || 0));
+  });
+  const entries = [...tiposDespesa.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    .map(([tipoDespesa, total]) => ({ value: tipoDespesa, label: tipoDespesa || 'Sem tipo de despesa', total }));
+  renderGroup2Totals('Tipo de despesa', entries,
+    tipoDespesa => showTotalsBySubtype(tipo, pagamento, centro, tipoDespesa),
+    () => showTotalsByCenter(tipo, pagamento));
+}
+
+function showTotalsBySubtype(tipo, pagamento, centro, tipoDespesa){
+  const subtipos = new Map();
+  contas.filter(c => c.tipo === tipo && String(c.pagamento || '').trim() === pagamento && String(c.centro || '').trim() === centro && String(c.tipoDespesa || '').trim() === tipoDespesa).forEach(c => {
+    const subtipo = String(c.subtipo || '').trim();
+    subtipos.set(subtipo, (subtipos.get(subtipo) || 0) + Number(c.valor || 0));
+  });
+  const entries = [...subtipos.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    .map(([subtipo, total]) => ({ value: subtipo, label: subtipo || 'Sem subtipo', total }));
+  renderGroup2Totals('Subtipo de despesa', entries,
+    subtipo => showGroup2Documents(tipo, pagamento, centro, tipoDespesa, subtipo),
+    () => showTotalsByExpenseType(tipo, pagamento, centro));
+}
+
+function renderGroup2Totals(titulo, entries, onSelect, onBack = showTotalsByType){
+  const linhas = entries.length ? entries.map((entry, index) => `
+    <button type="button" class="type-line" data-group2-entry="${index}" style="width:100%;border:0;background:transparent;text-align:left;cursor:pointer;">
+      <span>${esc(entry.label)}</span><strong>${dinheiro(entry.total)}</strong>
+    </button>
+  `).join('') : '<div class="type-line"><span>Nenhum lançamento</span><strong>R$ 0,00</strong></div>';
+  $('accountTable').innerHTML = `
+    <div style="margin-bottom:10px;"><button id="backGroup2Btn" class="btn secondary" type="button">Voltar</button></div>
+    <article class="type-card">
+      <div class="type-title">${esc(titulo)}</div>
+      <div class="type-subgroup">${linhas}</div>
+    </article>
+  `;
+  document.querySelectorAll('[data-group2-entry]').forEach(button => {
+    button.addEventListener('click', () => onSelect(entries[Number(button.dataset.group2Entry)].value));
+  });
+  const backBtn = $('backGroup2Btn');
+  if (backBtn) backBtn.addEventListener('click', onBack);
+}
+
+function showGroup2Documents(tipo, pagamento, centro, tipoDespesa, subtipo){
+  const documentos = contas.filter(c =>
+    c.tipo === tipo && String(c.pagamento || '').trim() === pagamento &&
+    String(c.centro || '').trim() === centro && String(c.tipoDespesa || '').trim() === tipoDespesa &&
+    String(c.subtipo || '').trim() === subtipo
+  ).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+  const cards = documentos.map(c => `
+    <article class="launch-card">
+      <div class="launch-header">
+        <div class="launch-title">${esc(c.titulo || 'Sem título')}</div>
+        <span class="badge ${c.pago ? 'badge-pago' : 'badge-pendente'}">${c.pago ? 'Pago' : 'Pendente'}</span>
+      </div>
+      <div class="launch-meta">
+        <div class="meta-row meta-row-secondary">
+          <div class="meta-item"><span class="meta-label">Data de pagamento</span><span class="meta-value">${esc(dataBR(c.data) || '—')}</span></div>
+          <div class="meta-item meta-item-value"><span class="meta-label">Valor</span><span class="launch-value">${dinheiro(c.valor)}</span></div>
+        </div>
+        <div class="meta-item"><span class="meta-label">Observação</span><span class="meta-value">${esc(c.obs || '—')}</span></div>
+      </div>
+    </article>
+  `).join('');
+  $('accountTable').innerHTML = `
+    <div style="margin-bottom:10px;"><button id="backGroup2DocsBtn" class="btn secondary" type="button">Voltar</button></div>
+    <div class="launch-grid">${cards || '<div class="empty">Nenhum documento encontrado.</div>'}</div>
+  `;
+  const backBtn = $('backGroup2DocsBtn');
+  if (backBtn) backBtn.addEventListener('click', () => showTotalsBySubtype(tipo, pagamento, centro, tipoDespesa));
+}
+
+bindIfExists('dashboardGroup2Btn', () => { mostrarLista(); showTotalsByType(); });
+
 function showGroupDetail(key){
   currentGroupKey = key;
-  const parts = key.split('||');
-  const [tipo, centro, tipoDesp, subtipo, status] = parts;
+  const [tipo, pagamento, centro, tipoDesp, subtipo] = JSON.parse(key);
   const lista = contas.filter(c => {
-    const s = c.pago ? 'Pago' : 'Pendente';
-    return String(c.tipo || '') === tipo && String(c.centro || '') === centro && String(c.tipoDespesa || '') === tipoDesp && String(c.subtipo || '') === subtipo && s === status;
+    return String(c.tipo || '') === tipo && String(c.pagamento || '').trim() === pagamento && String(c.centro || '') === centro && String(c.tipoDespesa || '') === tipoDesp && String(c.subtipo || '') === subtipo;
   }).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
   // show header back button
   const backHtml = `<div style="margin-bottom:10px;"><button id="backGroupsBtn2" class="btn secondary">Voltar</button></div>`;
@@ -718,6 +903,7 @@ if (dataInput) {
     if (dataNative) {
       const iso = dataISO(formatado);
       dataNative.value = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
+      sincronizarPeriodoComData(iso);
     }
   });
 }
@@ -727,8 +913,12 @@ if (dataNative) {
     if (!dataNative.value) return;
     const iso = dataISO(dataNative.value);
     dataInput.value = formataDataTexto(iso);
+    sincronizarPeriodoComData(iso);
   });
 }
+
+const mesAnoSelect = $('lancamentoMesAno');
+if (mesAnoSelect) mesAnoSelect.addEventListener('change', sincronizarDataComPeriodo);
 
 if (dataCalendarBtn && dataNative) {
   dataCalendarBtn.addEventListener('click', (event) => {
