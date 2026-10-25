@@ -13,6 +13,7 @@
     <header class="topbar">
       <div>
         <h1>Controle financeiro</h1>
+        <span id="appVersion" class="app-version">Versão 1.0.5</span>
       </div>
       <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
         <span id="userDisplay" style="display:none;margin-right:8px;"></span>
@@ -120,8 +121,8 @@
           </div>
 
           <div class="field">
-            <label for="pagamento">Pagamento</label>
-            <select id="pagamento">
+            <label for="pagamento">Pagamento *</label>
+            <select id="pagamento" required>
               <option value="">Selecione</option>
             </select>
           </div>
@@ -161,6 +162,11 @@
             </div>
           </div>
 
+          <div class="field">
+            <label for="parcela">Parcela (xx/yy) *</label>
+            <input id="parcela" type="text" inputmode="numeric" maxlength="5" placeholder="Ex.: 01/12" pattern="[0-9]{2}/[0-9]{2}" title="Digite quatro números; a barra será inserida automaticamente (ex.: 0112 → 01/12)" required>
+          </div>
+
           <div class="field field-check">
             <label>Status</label>
             <label class="switch-row">
@@ -177,6 +183,7 @@
         </div>
 
         <div class="form-actions">
+          <button type="button" class="btn generate-installments hidden" id="generateInstallmentsBtn">Gerar parcelas</button>
           <button type="button" class="btn secondary" id="cancelBtn">Cancelar</button>
           <button type="submit" class="btn primary">Salvar lançamento</button>
         </div>
@@ -215,8 +222,12 @@
           <button class="tab-btn" type="button" data-tab="subtipos">Subtipo de despesa</button>
           <button id="userManageBtn" class="tab-btn" type="button" style="display:none;">Usuário</button>
           <button class="tab-btn" type="button" data-tab="pagamentos">Pagamento</button>
+          <button id="exportExcelBtn" class="tab-btn export-excel-btn" type="button">Exportar .xls</button>
+          <button id="importExcelBtn" class="tab-btn export-excel-btn" type="button">Importar .xls</button>
+          <input id="importExcelFile" type="file" accept=".xls,application/vnd.ms-excel" hidden>
         </div>
       </div>
+      <div id="importExcelStatus" class="import-excel-status" role="status" aria-live="polite" hidden></div>
 
       <div class="management-content">
         <div class="tab-panel active" id="centrosPanel">

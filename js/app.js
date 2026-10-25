@@ -1,6 +1,10 @@
 const STORAGE_KEY = 'rsContas_sqlite_db';
 const DEFAULT_DB_NAME = 'rsContas.db';
 
+fetch('/api/version').then(response => response.ok ? response.json() : null).then(info => {
+  if (info?.version && $('appVersion')) $('appVersion').textContent = `Versão ${info.version}`;
+}).catch(() => {});
+
 let contas = [];
 let categorias = {
   centros: [],
@@ -331,6 +335,14 @@ function dataBR(iso){
   return `${dia}/${mes}/${ano}`;
 }
 
+function mesAnoBR(data){
+  const iso = dataISO(data);
+  const partes = iso.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!partes) return '';
+  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  return `${meses[Number(partes[2]) - 1]} ${partes[1]}`;
+}
+
 function formataDataTexto(data){
   const iso = dataISO(data || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
@@ -362,6 +374,17 @@ function dataISO(data){
   }
 
   return valor;
+}
+
+function formatarParcelaDigitada(valor){
+  const numeros = String(valor || '').replace(/\D/g, '').slice(0, 4);
+  return numeros.length > 2 ? `${numeros.slice(0, 2)}/${numeros.slice(2)}` : numeros;
+}
+
+function normalizarParcelaSalva(valor){
+  const partes = String(valor || '').match(/^\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*$/);
+  if (partes) return `${partes[1].padStart(2, '0')}/${partes[2].padStart(2, '0')}`;
+  return formatarParcelaDigitada(valor);
 }
 
 function sincronizarPeriodoComData(data){
@@ -411,6 +434,9 @@ function abrirForm(conta = null){
   $('tipoDespesa').value = conta?.tipoDespesa || categorias.tipos[0] || '';
   $('subtipoDespesa').value = conta?.subtipo || categorias.subtipos[0] || '';
   const pagamentoSel = $('pagamento'); if (pagamentoSel) pagamentoSel.value = conta?.pagamento || categorias.pagamentos[0] || '';
+  $('parcela').value = normalizarParcelaSalva(conta?.parcela || '');
+  const gerarParcelasBtn = $('generateInstallmentsBtn');
+  if (gerarParcelasBtn) gerarParcelasBtn.classList.toggle('hidden', !conta || !temParcelasFuturas(conta));
   $('valor').value = conta ? String(conta.valor).replace('.', ',') : '';
   const dataAtual = conta?.data || new Date().toISOString().slice(0, 10);
   $('data').value = formataDataTexto(dataAtual);
@@ -473,6 +499,7 @@ if (form) {
       tipoDespesa: $('tipoDespesa').value,
       subtipo: $('subtipoDespesa').value,
       pagamento: $('pagamento') ? $('pagamento').value : '',
+      parcela: $('parcela').value.trim(),
       valor: numero($('valor').value),
       data: dataISO($('data').value || $('dataNative').value),
       pago: $('pago').checked,
@@ -559,13 +586,60 @@ async function excluir(id){
 }
 window.excluir = excluir;
 
+function temParcelasFuturas(conta){
+  const partes = String(conta.parcela || '').match(/^(\d{2})\/(\d{2})$/);
+  return !!partes && Number(partes[1]) >= 1 && Number(partes[1]) <= Number(partes[2]);
+}
+
+async function gerarParcelas(){
+  const id = $('accountId').value;
+  const conta = contas.find(item => item.id === id);
+  if (!conta) return;
+  const partes = String(conta.parcela || '').match(/^(\d{2})\/(\d{2})$/);
+  if (!partes) return;
+  const atual = Number(partes[1]);
+  const totalAtual = Number(partes[2]);
+  const maximo = 99 - atual;
+  const sugestao = Math.max(1, totalAtual - atual);
+  const resposta = prompt(`Quantas novas parcelas deseja gerar para ${conta.titulo || 'este lançamento'}? Máximo: ${maximo}.`, String(sugestao));
+  if (resposta === null) return;
+  const quantidade = Number(resposta.trim());
+  if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > maximo) {
+    alert(`Informe um número inteiro entre 1 e ${maximo}.`);
+    return;
+  }
+
+  try {
+    const button = $('generateInstallmentsBtn');
+    button.disabled = true;
+    const resultado = await fetchJson(`/api/contas/${encodeURIComponent(id)}/gerar-parcelas`, {
+      method: 'POST',
+      body: JSON.stringify({ quantidade })
+    });
+    await carregarContasApi();
+    const contaAtualizada = contas.find(item => item.id === id);
+    if (contaAtualizada) $('parcela').value = normalizarParcelaSalva(contaAtualizada.parcela);
+    atualizar();
+    alert(`Parcelas geradas: ${resultado.criadas}. Já existentes: ${resultado.existentes}. Total da sequência: ${resultado.total}.`);
+  } catch (error) {
+    alert(error.message || 'Não foi possível gerar as parcelas.');
+  } finally {
+    const button = $('generateInstallmentsBtn');
+    if (button) button.disabled = false;
+  }
+}
+window.gerarParcelas = gerarParcelas;
+
 function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
 
 function renderLaunchCardsHTML(lista){
   return (lista || []).map(c => `
     <article class="launch-card" data-id="${c.id}">
       <div class="launch-header">
-        <div class="launch-title">${esc(c.titulo)}</div>
+        <div class="launch-title">
+          <span class="launch-period">${esc(mesAnoBR(c.data))}</span>
+          <span class="launch-title-text">${esc(c.titulo || 'Sem título')}</span>
+        </div>
         <div class="launch-badges">
           <span class="badge ${c.tipo === 'P' ? 'badge-pagar' : 'badge-receber'}">${c.tipo === 'P' ? 'A pagar' : 'A receber'}</span>
         </div>
@@ -587,6 +661,10 @@ function renderLaunchCardsHTML(lista){
           <div class="meta-item">
             <span class="meta-label">Data</span>
             <span class="meta-value">${dataBR(c.data)}</span>
+          </div>
+          <div class="meta-item meta-item-installment">
+            <span class="meta-label">Parcela</span>
+            <span class="meta-value">${esc(c.parcela || '—')}</span>
           </div>
           <div class="meta-item meta-item-value">
             <span class="meta-label">Valor</span>
@@ -625,8 +703,85 @@ const mostrarCadastro = () => {
 bindIfExists('newAccountBtn', mostrarCadastro);
 bindIfExists('managementBtn', mostrarCadastros);
 bindIfExists('viewLaunchesBtn', mostrarLista);
+bindIfExists('exportExcelBtn', async () => {
+  const button = $('exportExcelBtn');
+  button.disabled = true;
+  try {
+    const token = localStorage.getItem('rs_token');
+    const response = await fetch('/api/exportar-excel', {
+      headers: token ? { Authorization: 'Bearer ' + token } : {}
+    });
+    if (!response.ok) throw new Error('Não foi possível exportar os dados. Faça login novamente e tente outra vez.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'rscontas_exportacao.xls';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(error.message || 'Erro ao exportar os dados.');
+  } finally {
+    button.disabled = false;
+  }
+});
+bindIfExists('importExcelBtn', () => $('importExcelFile')?.click());
+const importExcelFile = $('importExcelFile');
+if (importExcelFile) importExcelFile.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const button = $('importExcelBtn');
+  const status = $('importExcelStatus');
+  button.disabled = true;
+  if (status) {
+    status.hidden = false;
+    status.className = 'import-excel-status is-loading';
+    status.textContent = 'Aguarde, a importação está em andamento...';
+    await new Promise(requestAnimationFrame);
+  }
+  try {
+    const token = localStorage.getItem('rs_token');
+    const formData = new FormData();
+    formData.append('arquivo', file);
+    const response = await fetch('/api/importar-excel', {
+      method: 'POST',
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+      body: formData
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível importar a planilha.');
+    await inicializarDados();
+    const ignorados = result.ignorados || [];
+    const detalhesIgnorados = ignorados.slice(0, 8)
+      .map(item => `Linha ${item.linha}: ${item.motivo}`).join('\n');
+    const complemento = ignorados.length
+      ? `\nIgnorados: ${ignorados.length}${detalhesIgnorados ? `\n${detalhesIgnorados}` : ''}${ignorados.length > 8 ? '\n...' : ''}`
+      : '';
+    const mensagem = `Importação finalizada: ${result.lancamentos} lançamentos e ${result.cadastros} cadastros processados.${complemento}`;
+    if (status) {
+      status.className = 'import-excel-status is-success';
+      status.textContent = mensagem;
+    } else {
+      alert(mensagem);
+    }
+  } catch (error) {
+    const mensagem = error.message || 'Erro ao importar a planilha.';
+    if (status) {
+      status.className = 'import-excel-status is-error';
+      status.textContent = mensagem;
+    } else {
+      alert(mensagem);
+    }
+  } finally {
+    button.disabled = false;
+    event.target.value = '';
+  }
+});
 bindIfExists('closeFormBtn', fecharForm);
 bindIfExists('cancelBtn', fecharForm);
+bindIfExists('generateInstallmentsBtn', gerarParcelas);
 
 const searchInput = $('search');
 const filterType = $('filterType');
@@ -787,12 +942,16 @@ function showGroup2Documents(tipo, pagamento, centro, tipoDespesa, subtipo){
   const cards = documentos.map(c => `
     <article class="launch-card">
       <div class="launch-header">
-        <div class="launch-title">${esc(c.titulo || 'Sem título')}</div>
+        <div class="launch-title">
+          <span class="launch-period">${esc(mesAnoBR(c.data))}</span>
+          <span class="launch-title-text">${esc(c.titulo || 'Sem título')}</span>
+        </div>
         <span class="badge ${c.pago ? 'badge-pago' : 'badge-pendente'}">${c.pago ? 'Pago' : 'Pendente'}</span>
       </div>
       <div class="launch-meta">
         <div class="meta-row meta-row-secondary">
           <div class="meta-item"><span class="meta-label">Data de pagamento</span><span class="meta-value">${esc(dataBR(c.data) || '—')}</span></div>
+          <div class="meta-item meta-item-installment"><span class="meta-label">Parcela</span><span class="meta-value">${esc(c.parcela || '—')}</span></div>
           <div class="meta-item meta-item-value"><span class="meta-label">Valor</span><span class="launch-value">${dinheiro(c.valor)}</span></div>
         </div>
         <div class="meta-item"><span class="meta-label">Observação</span><span class="meta-value">${esc(c.obs || '—')}</span></div>
@@ -919,6 +1078,11 @@ if (dataNative) {
 
 const mesAnoSelect = $('lancamentoMesAno');
 if (mesAnoSelect) mesAnoSelect.addEventListener('change', sincronizarDataComPeriodo);
+
+const parcelaInput = $('parcela');
+if (parcelaInput) parcelaInput.addEventListener('input', () => {
+  parcelaInput.value = formatarParcelaDigitada(parcelaInput.value);
+});
 
 if (dataCalendarBtn && dataNative) {
   dataCalendarBtn.addEventListener('click', (event) => {

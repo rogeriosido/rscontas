@@ -1,5 +1,17 @@
 /* management header layout: tabs + user button aligned in one row; wrap on small screens */
 .management-header{display:block;margin-bottom:12px}
+.import-excel-status{margin:0 0 14px;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.45}
+.import-excel-status[hidden]{display:none}
+.import-excel-status.is-loading{background:#eff6ff;color:#1d4ed8}
+.import-excel-status.is-loading:before{content:"";display:inline-block;width:13px;height:13px;margin-right:9px;vertical-align:-2px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:import-spin .8s linear infinite}
+.import-excel-status.is-success{background:#dcfce7;color:#166534}
+.import-excel-status.is-error{background:#fee2e2;color:#991b1b}
+@keyframes import-spin{to{transform:rotate(360deg)}}
+.app-version{display:block;margin-top:3px;color:#7a818c;font-size:12px;font-weight:600}
+.management-header .management-tabs .export-excel-btn,
+.management-header .management-tabs .export-excel-btn:hover,
+.management-header .management-tabs .export-excel-btn:focus{background:#15803d;color:#fff;border-color:#15803d}
+.management-header .management-tabs .export-excel-btn:hover{background:#166534;border-color:#166534}
 .management-header .management-tabs{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px}
 .management-header .management-tabs .tab-btn{width:100%;display:inline-flex;align-items:center;justify-content:center}
 
@@ -24,13 +36,22 @@
 .form-grid .span-3{grid-column:1/-1}
 
 .launch-badges{display:flex;align-items:flex-start;justify-content:flex-end;gap:4px;flex-wrap:wrap}
+.launch-period{display:block;font-size:14px;font-weight:800;color:#1f2937}
+.launch-title-text{display:block;margin-top:2px;font-size:11px;font-weight:600;color:#687385}
+.launch-card .meta-row-secondary{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end}
+.launch-card .meta-row-secondary .meta-item-installment{align-items:center;text-align:center}
+.launch-card .meta-row-secondary .meta-item-installment .meta-value{text-align:center}
+.launch-card .meta-row-secondary .meta-item-value{align-items:flex-end;text-align:right}
+.launch-card .meta-row-secondary .meta-item-value .meta-value{text-align:right}
 .payment-actions-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;min-width:0}
 .payment-actions-row .meta-item{min-width:0}
 .payment-actions-row .meta-value{overflow-wrap:anywhere;word-break:normal}
 .payment-actions-row .actions{justify-self:end;flex:0 0 auto}
 .payment-actions-row .actions button{flex:0 0 auto}
-.launch-card .meta-row .meta-item:nth-child(2){align-items:flex-end;text-align:right}
-.launch-card .meta-row .meta-item:nth-child(2) .meta-value{ text-align:right }
+.generate-installments{border:0;border-radius:10px;padding:13px 16px;background:#15803d;color:#fff;cursor:pointer;font-size:13px;font-weight:700}
+.generate-installments:hover{background:#166534}
+.launch-card .meta-row:not(.meta-row-secondary) .meta-item:nth-child(2){align-items:flex-end;text-align:right}
+.launch-card .meta-row:not(.meta-row-secondary) .meta-item:nth-child(2) .meta-value{text-align:right}
 .launch-status{width:100%;margin-top:auto}
 .launch-status .badge{display:block;width:100%}
 .type-card-heading{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;width:100%}
