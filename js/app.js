@@ -224,8 +224,66 @@ async function inicializarDados(){
   atualizar();
 }
 
+let produtosCadastrados = [];
+async function carregarProdutos() {
+  try {
+    const produtos = await fetchJson('/api/produtos');
+    produtosCadastrados = Array.isArray(produtos) ? produtos : [];
+    const tbody = $('productsTableBody');
+    const empty = $('productsEmpty');
+    if (!tbody || !empty) return;
+    tbody.innerHTML = produtos.map(produto => {
+      const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(produto.data_ultimo_preco || '');
+      const displayDate = dateMatch ? `${dateMatch[3]}/${dateMatch[2]}/${dateMatch[1]}` : '';
+      const lastPrice = produto.ultimo_preco == null
+        ? 'Sem pre\u00e7o registrado'
+        : `R$ ${Number(produto.ultimo_preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 10 })}${displayDate ? ` <span class="product-last-price-date">(${displayDate})</span>` : ''}`;
+      return `<tr data-product-id="${esc(produto.id)}"><td data-label="C\u00f3digo de barras">${esc(produto.codigo_barras)}</td><td data-label="Nome do produto">${esc(produto.nome)}</td><td data-label="Pre\u00e7os e a\u00e7\u00f5es"><div class="product-last-price">${lastPrice}</div><div class="product-actions"><button class="btn secondary product-prices-btn" type="button">Pre\u00e7os</button><button class="btn secondary product-edit-btn" type="button">Editar</button></div></td></tr>`;
+    }).join('');
+    empty.style.display = produtos.length ? 'none' : 'block';
+    $('productsCount').textContent = `${produtos.length} produto${produtos.length === 1 ? '' : 's'} cadastrado${produtos.length === 1 ? '' : 's'}`;
+  } catch (error) {
+    console.warn('Erro ao carregar produtos:', error);
+    alert('N\u00e3o foi poss\u00edvel carregar os produtos. Verifique se voc\u00ea est\u00e1 conectado.');
+  }
+}
+
 const $ = id => document.getElementById(id);
 const form = $('accountForm');
+const invoiceDateInput = $('invoiceDate');
+if (invoiceDateInput && !invoiceDateInput.value) {
+  invoiceDateInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+const invoiceCaptureBody = $('invoiceCaptureBody');
+if (invoiceCaptureBody) invoiceCaptureBody.addEventListener('input', event => {
+  if (event.target.matches('.invoice-product-barcode')) {
+    const index = event.target.dataset.index;
+    const checkbox = invoiceCaptureBody.querySelector(`.invoice-product-check[data-index="${index}"]`);
+    if (checkbox) {
+      checkbox.disabled = !event.target.value.trim();
+      checkbox.checked = !checkbox.disabled;
+    }
+    return;
+  }
+  if (!event.target.matches('.invoice-product-quantity, .invoice-product-value')) return;
+  const row = event.target.closest('tr');
+  const cells = row?.querySelectorAll('td');
+  if (!cells || cells.length < 8) return;
+  const parse = value => {
+    const text = String(value || '').trim();
+    return text ? Number(text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text) : NaN;
+  };
+  const quantity = parse(row.querySelector('.invoice-product-quantity').value);
+  const value = parse(row.querySelector('.invoice-product-value').value);
+  const discount = parse(cells[5].textContent);
+  const net = quantity > 0 && Number.isFinite(value) && Number.isFinite(discount) ? value - discount / quantity : NaN;
+  const total = Number.isFinite(net) ? quantity * net : NaN;
+  const money = number => Number.isFinite(number) ? number.toFixed(2).replace('.', ',') : '';
+  cells[6].textContent = money(net);
+  cells[7].textContent = money(total);
+  const grandTotal = Array.from(invoiceCaptureBody.querySelectorAll('tr')).reduce((sum, productRow) => sum + (parse(productRow.cells[7]?.textContent) || 0), 0);
+  $('invoiceCaptureFooter').innerHTML = `<tr><th colspan="7">Total geral dos produtos</th><th>${grandTotal.toFixed(2).replace('.', ',')}</th></tr>`;
+});
 
 const bindIfExists = (id, handler) => {
   const el = $(id);
@@ -703,6 +761,329 @@ const mostrarCadastro = () => {
 bindIfExists('newAccountBtn', mostrarCadastro);
 bindIfExists('managementBtn', mostrarCadastros);
 bindIfExists('viewLaunchesBtn', mostrarLista);
+bindIfExists('productsBtn', async () => {
+  mostrarTela('productsPanel');
+  await carregarProdutos();
+});
+
+const productForm = $('productForm');
+if (productForm) productForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const submit = productForm.querySelector('[type="submit"]');
+  submit.disabled = true;
+  try {
+    await fetchJson('/api/produtos', {
+      method: 'POST',
+      body: JSON.stringify({ codigo_barras: $('productBarcode').value, nome: $('productName').value })
+    });
+    productForm.reset();
+    await carregarProdutos();
+  } catch (error) {
+    alert(error.message.includes('409') ? 'J\u00e1 existe um produto com este c\u00f3digo de barras.' : 'N\u00e3o foi poss\u00edvel cadastrar o produto. Verifique os dados e tente novamente.');
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+const productsTableBody = $('productsTableBody');
+if (productsTableBody) productsTableBody.addEventListener('click', async event => {
+  const button = event.target.closest('button');
+  if (button?.classList.contains('product-price-delete-btn')) {
+    if (!window.confirm('Apagar este registro de pre\u00e7o?')) return;
+    const detailRow = button.closest('tr.product-prices-detail');
+    const productId = detailRow?.previousElementSibling?.dataset.productId;
+    button.disabled = true;
+    try {
+      await fetchJson(`/api/produtos/precos/${encodeURIComponent(button.dataset.priceId)}`, { method: 'DELETE' });
+      await carregarProdutos();
+      const refreshedProductRow = Array.from(productsTableBody.querySelectorAll('tr[data-product-id]')).find(item => item.dataset.productId === productId);
+      refreshedProductRow?.querySelector('.product-prices-btn')?.click();
+    } catch (error) {
+      alert('N\u00e3o foi poss\u00edvel apagar este registro de pre\u00e7o.');
+      button.disabled = false;
+    }
+    return;
+  }
+  const row = button?.closest('tr[data-product-id]');
+  if (!button || !row) return;
+  if (button.classList.contains('product-prices-btn')) {
+    const nextRow = row.nextElementSibling;
+    if (nextRow?.classList.contains('product-prices-detail')) {
+      nextRow.remove();
+      button.textContent = 'Preços';
+      return;
+    }
+    button.disabled = true;
+    try {
+      const prices = await fetchJson(`/api/produtos/${encodeURIComponent(row.dataset.productId)}/precos`);
+      const details = prices.length
+        ? `<div class="product-prices-scroll"><table class="product-prices-table"><thead><tr><th>Mercado</th><th>Cupom</th><th>Data</th><th>Quantidade</th><th>Valor unit\u00e1rio</th><th>A\u00e7\u00e3o</th></tr></thead><tbody>${prices.map(price => {
+            const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(price.data || '');
+            const displayDate = dateMatch ? `${dateMatch[3]}/${dateMatch[2]}/${dateMatch[1]}` : esc(price.data);
+            const quantity = Number(price.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
+            const value = Number(price.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 10 });
+            return `<tr><td>${esc(price.mercado)}</td><td>${esc(price.cupom || '')}</td><td>${displayDate}</td><td>${quantity}</td><td>R$ ${value}</td><td><button class="btn secondary product-price-delete-btn" type="button" data-price-id="${esc(price.id)}">Apagar</button></td></tr>`;
+          }).join('')}</tbody></table></div>`
+        : '<p class="product-prices-empty">Nenhum pre\u00e7o registrado para este produto.</p>';
+      const detailRow = document.createElement('tr');
+      detailRow.className = 'product-prices-detail';
+      detailRow.innerHTML = `<td colspan="3" data-label="Hist\u00f3rico de pre\u00e7os"><strong>Hist\u00f3rico de pre\u00e7os</strong>${details}</td>`;
+      row.after(detailRow);
+      button.textContent = 'Ocultar preços';
+    } catch (error) {
+      alert('N\u00e3o foi poss\u00edvel carregar os pre\u00e7os deste produto.');
+    } finally {
+      button.disabled = false;
+    }
+    return;
+  }
+  if (button.classList.contains('product-edit-btn')) {
+    const cells = row.querySelectorAll('td');
+    row.dataset.originalCode = cells[0].textContent.trim();
+    row.dataset.originalName = cells[1].textContent.trim();
+    cells[0].innerHTML = `<input class="product-edit-code" type="text" maxlength="80" value="${esc(row.dataset.originalCode)}" aria-label="C\u00f3digo de barras">`;
+    cells[1].innerHTML = `<input class="product-edit-name" type="text" maxlength="160" value="${esc(row.dataset.originalName)}" aria-label="Nome do produto">`;
+    cells[2].innerHTML = '<button class="btn primary product-save-btn" type="button">Salvar</button> <button class="btn secondary product-cancel-btn" type="button">Cancelar</button>';
+    cells[1].querySelector('input').focus();
+    return;
+  }
+  if (button.classList.contains('product-cancel-btn')) {
+    await carregarProdutos();
+    return;
+  }
+  if (!button.classList.contains('product-save-btn')) return;
+  const codigo_barras = row.querySelector('.product-edit-code')?.value.trim();
+  const nome = row.querySelector('.product-edit-name')?.value.trim();
+  if (!codigo_barras || !nome) {
+    alert('Informe o c\u00f3digo de barras e o nome do produto.');
+    return;
+  }
+  button.disabled = true;
+  try {
+    await fetchJson(`/api/produtos/${encodeURIComponent(row.dataset.productId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ codigo_barras, nome })
+    });
+    await carregarProdutos();
+  } catch (error) {
+    let message = error.message || 'N\u00e3o foi poss\u00edvel salvar as altera\u00e7\u00f5es do produto.';
+    try { message = JSON.parse(message).error || message; } catch (parseError) {}
+    alert(message);
+    button.disabled = false;
+  }
+});
+
+bindIfExists('openInvoiceLookupBtn', () => {
+  const chave = $('invoiceKey').value.replace(/\D/g, '');
+  const status = $('invoiceImportStatus');
+  if (chave.length !== 44) {
+    status.textContent = 'Informe uma chave de acesso NFC-e com 44 d\u00edgitos.';
+    return;
+  }
+  const url = `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?chNFe=${chave}&nVersao=100`;
+  window.open(url, 'rsContasNfceLookup');
+  status.textContent = 'Consulta aberta. Copie os dados da aba Produtos / Servi\u00e7os e cole no campo para analisar.';
+});
+
+let capturedInvoiceProducts = [];
+function renderCapturedInvoiceProducts(items) {
+  if (!Array.isArray(items) || items.length > 1000) return false;
+  const parseNumber = value => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return NaN;
+    return Number(normalized.includes(',') ? normalized.replace(/\./g, '').replace(',', '.') : normalized);
+  };
+  const money = value => Number.isFinite(value) ? value.toFixed(2).replace('.', ',') : '';
+  const inputNumber = value => Number.isFinite(value)
+    ? value.toFixed(10).replace(/\.?0+$/, '').replace('.', ',')
+    : '';
+  const groups = new Map();
+  items.filter(item => item && (typeof item.nome === 'string' || item.codigo_barras)).forEach(item => {
+    const nome = String(item.nome || '').trim().slice(0, 160);
+    const codigo_barras = String(item.codigo_barras || '').replace(/\D/g, '').slice(0, 80);
+    if (!nome && !codigo_barras) return;
+    const key = `${codigo_barras}|${nome.toLocaleLowerCase()}`;
+    const quantidade = parseNumber(item.quantidade_comercial);
+    const valor = parseNumber(item.valor_unitario);
+    const liquido = parseNumber(item.base_icms_normal);
+    const qtd = Number.isFinite(quantidade) ? quantidade : 0;
+    const descontoUnitario = Number.isFinite(valor) && Number.isFinite(liquido) && valor > liquido ? valor - liquido : 0;
+    const linhaDesconto = descontoUnitario * qtd;
+    let group = groups.get(key);
+    if (!group) {
+      group = { nome, codigo_barras, quantidade: 0, valorNumerador: 0, valorPeso: 0, desconto: 0 };
+      groups.set(key, group);
+    }
+    group.quantidade += qtd;
+    if (Number.isFinite(valor)) { group.valorNumerador += valor * qtd; group.valorPeso += qtd; }
+    group.desconto += linhaDesconto;
+  });
+  capturedInvoiceProducts = Array.from(groups.values()).map(group => {
+    const valor = group.valorPeso ? group.valorNumerador / group.valorPeso : NaN;
+    const valorLiquido = group.quantidade > 0 && Number.isFinite(valor)
+      ? valor - group.desconto / group.quantidade
+      : NaN;
+    const total = group.quantidade > 0 && Number.isFinite(valorLiquido)
+      ? group.quantidade * valorLiquido
+      : NaN;
+    return {
+      nome: group.nome,
+      codigo_barras: group.codigo_barras,
+      ja_cadastrado: produtosCadastrados.some(product => String(product.codigo_barras || '').replace(/\D/g, '') === group.codigo_barras),
+      quantidade_comercial: group.quantidade.toFixed(4).replace('.', ','),
+      valor_unitario: inputNumber(valor),
+      desconto: money(group.desconto),
+      base_icms_normal: money(valorLiquido),
+      total: money(total)
+    };
+  });
+  $('invoiceCaptureBody').innerHTML = capturedInvoiceProducts.map((item, index) => `<tr>
+    <td data-label="Registrar pre\u00e7o"><input class="invoice-product-check" data-index="${index}" type="checkbox" ${item.codigo_barras ? 'checked' : ''} ${!item.codigo_barras ? 'disabled title="Informe um c\u00f3digo para vincular o pre\u00e7o"' : ''} aria-label="Registrar pre\u00e7o de ${esc(item.nome || item.codigo_barras)}"></td>
+    <td data-label="C\u00f3digo"><input class="invoice-product-barcode" data-index="${index}" type="text" maxlength="80" value="${esc(item.codigo_barras)}" placeholder="EAN n\u00e3o encontrado"></td>
+    <td data-label="Produto"><input class="invoice-product-name" data-index="${index}" type="text" maxlength="160" value="${esc(item.nome)}" placeholder="Informe o nome" aria-label="Nome do produto" ${item.ja_cadastrado ? 'disabled title="Produto j\u00e1 cadastrado; o pre\u00e7o ser\u00e1 vinculado a ele"' : ''}></td>
+    <td data-label="Quantidade"><input class="invoice-product-quantity" data-index="${index}" type="text" inputmode="decimal" value="${esc(item.quantidade_comercial)}" aria-label="Quantidade"></td>
+    <td data-label="Valor unit\u00e1rio"><input class="invoice-product-value" data-index="${index}" type="text" inputmode="decimal" value="${esc(item.valor_unitario)}" aria-label="Valor unit\u00e1rio"></td>
+    <td data-label="Desconto">${esc(item.desconto)}</td>
+    <td data-label="Valor l\u00edquido">${esc(item.base_icms_normal)}</td>
+    <td data-label="Total">${esc(item.total)}</td>
+  </tr>`).join('');
+  const totalGeral = capturedInvoiceProducts.reduce((total, item) => total + (parseNumber(item.total) || 0), 0);
+  $('invoiceCaptureFooter').innerHTML = `<tr><th colspan="7">Total geral dos produtos</th><th>${totalGeral.toFixed(2).replace('.', ',')}</th></tr>`;
+  const newProducts = capturedInvoiceProducts.filter(item => item.codigo_barras && !item.ja_cadastrado).length;
+  const existingProducts = capturedInvoiceProducts.filter(item => item.ja_cadastrado).length;
+  $('invoiceCaptureSummary').textContent = `${capturedInvoiceProducts.length} produto(s) agrupado(s); ${newProducts} novo(s); ${existingProducts} já cadastrado(s), com preço para registrar.`;
+  $('invoiceCapturePreview').hidden = capturedInvoiceProducts.length === 0;
+  $('invoiceImportStatus').textContent = capturedInvoiceProducts.length
+    ? 'Preencha Mercado e Data. Os itens selecionados registrar\u00e3o os pre\u00e7os; produtos novos tamb\u00e9m ser\u00e3o cadastrados.'
+    : 'Nenhum produto foi reconhecido. Copie tamb\u00e9m os campos Descri\u00e7\u00e3o e C\u00f3digo EAN da consulta.';
+  return capturedInvoiceProducts.length > 0;
+}
+
+function analisarTextoNfce(rawText) {
+  const normalized = String(rawText || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const lines = normalized.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const names = [];
+  const itemStarts = [];
+  for (let index = 0; index < lines.length; index++) {
+    const cells = lines[index].split(/\t+/).map(cell => cell.trim()).filter(Boolean);
+    if (cells.length >= 4 && /^\d{1,3}$/.test(cells[0])) {
+      const quantityIndex = cells.findIndex((cell, cellIndex) => cellIndex >= 2 && /^\d+[,.]\d+$/.test(cell));
+      if (quantityIndex === 2 && cells[1] && !/^\d+$/.test(cells[1])) {
+        names.push(cells[1]);
+        itemStarts.push(index);
+        continue;
+      }
+    }
+    if (/^\d{1,3}$/.test(lines[index]) && lines[index + 1] && lines[index + 2] && /^\d+[,.]\d+$/.test(lines[index + 2])) {
+      names.push(lines[index + 1].trim());
+      itemStarts.push(index);
+      index += 2;
+    } else {
+      const row = lines[index].match(/^\d{1,3}\s+(.+?)\s+\d+[,.]\d+\s+\S+\s+[\d.,]+$/);
+      if (row) {
+        names.push(row[1].trim());
+        itemStarts.push(index);
+      }
+    }
+  }
+  const valuesAfterLabel = (label, pattern = /^\d{8,14}$/) => {
+    const values = [];
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+      const position = line.indexOf(label);
+      if (position < 0) continue;
+      const sameLineValue = line.slice(position + label.length).trim();
+      const value = sameLineValue || (lines[index + 1] || '').trim();
+      values.push(pattern.test(value) ? value : '');
+    }
+    return values;
+  };
+  let codes = valuesAfterLabel('Codigo EAN Comercial');
+  if (!codes.some(Boolean)) codes = valuesAfterLabel('Codigo EAN Tributavel');
+  const productCodes = valuesAfterLabel('Codigo do Produto', /^\d{1,80}$/);
+  const quantities = valuesAfterLabel('Quantidade Comercial', /^\d+[,.]\d+$/);
+  const unitValues = valuesAfterLabel('Valor unitario de comercializacao', /^\d+[,.]\d+$/);
+  const bases = itemStarts.map((start, index) => {
+    const end = itemStarts[index + 1] ?? lines.length;
+    for (let lineIndex = start; lineIndex < end; lineIndex++) {
+      if (!lines[lineIndex].includes('Base de Calculo do ICMS Normal')) continue;
+      const sameLineValue = lines[lineIndex].replace('Base de Calculo do ICMS Normal', '').trim();
+      const value = sameLineValue || (lines[lineIndex + 1] || '').trim();
+      return /^\d+(?:[,.]\d+)?$/.test(value) ? value : '';
+    }
+    return '';
+  });
+  const asNumber = value => {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) return NaN;
+    return Number(normalizedValue.includes(',') ? normalizedValue.replace(/\./g, '').replace(',', '.') : normalizedValue);
+  };
+  const total = Math.max(names.length, codes.length, productCodes.length, quantities.length, unitValues.length, bases.length);
+  return Array.from({ length: total }, (_, index) => ({
+    nome: names[index] || '',
+    codigo_barras: codes[index] || productCodes[index] || '',
+    quantidade_comercial: quantities[index] || '',
+    valor_unitario: unitValues[index] || '',
+    base_icms_normal: bases[index] || '',
+    desconto: Number.isFinite(asNumber(unitValues[index])) && Number.isFinite(asNumber(bases[index])) && asNumber(unitValues[index]) > asNumber(bases[index])
+      ? (asNumber(unitValues[index]) - asNumber(bases[index])).toFixed(2).replace('.', ',')
+      : '0,00'
+  }));
+}
+
+bindIfExists('loadInvoiceCaptureBtn', () => {
+  const items = analisarTextoNfce($('invoiceCapturePayload').value);
+  if (!renderCapturedInvoiceProducts(items)) {
+    $('invoiceImportStatus').textContent = 'N\u00e3o encontrei itens. Na SEFAZ, selecione a aba Produtos / Servi\u00e7os com a Descri\u00e7\u00e3o e os C\u00f3digos EAN vis\u00edveis, copie e cole novamente.';
+  }
+});
+
+bindIfExists('importCapturedProductsBtn', async event => {
+  const button = event.currentTarget;
+  const products = Array.from(document.querySelectorAll('.invoice-product-check:checked')).map(check => {
+    const index = Number(check.dataset.index);
+    const row = check.closest('tr');
+    return {
+      codigo_barras: document.querySelector(`.invoice-product-barcode[data-index="${index}"]`)?.value.trim(),
+      nome: document.querySelector(`.invoice-product-name[data-index="${index}"]`)?.value.trim(),
+      quantidade: document.querySelector(`.invoice-product-quantity[data-index="${index}"]`)?.value.trim(),
+      valor: row?.cells[6]?.textContent.trim()
+    };
+  }).filter(item => item.codigo_barras && item.nome && item.quantidade && item.valor);
+  const mercado = $('invoiceMarket').value.trim();
+  const cupom = $('invoiceCoupon').value.trim();
+  const data = $('invoiceDate').value;
+  if (!mercado || !cupom || !data) {
+    $('invoiceImportStatus').textContent = 'Informe o mercado, o n\u00famero do cupom e a data para registrar os pre\u00e7os.';
+    const missingField = !mercado ? $('invoiceMarket') : (!cupom ? $('invoiceCoupon') : $('invoiceDate'));
+    missingField.focus();
+    missingField.reportValidity();
+    $('invoiceImportStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (!products.length) {
+    $('invoiceImportStatus').textContent = 'Selecione produtos com c\u00f3digo, quantidade e valor. Produtos existentes tamb\u00e9m podem receber um novo pre\u00e7o.';
+    $('invoiceImportStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  button.disabled = true;
+  $('invoiceImportStatus').textContent = 'Registrando produtos e pre\u00e7os...';
+  try {
+    const result = await fetchJson('/api/produtos/importar', {
+      method: 'POST',
+      body: JSON.stringify({ mercado, cupom, data, produtos: products })
+    });
+    $('invoiceImportStatus').textContent = `Conclu\u00eddo: ${result.produtos_inseridos} produto(s) novo(s), ${result.produtos_existentes} j\u00e1 cadastrado(s) e ${result.precos_inseridos} pre\u00e7o(s) registrado(s).`;
+    await carregarProdutos();
+  } catch (error) {
+    let message = error.message || '';
+    try { message = JSON.parse(message).error || message; } catch (parseError) {}
+    $('invoiceImportStatus').textContent = message || 'N\u00e3o foi poss\u00edvel registrar os produtos e pre\u00e7os. Verifique os dados e tente novamente.';
+    $('invoiceImportStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } finally {
+    button.disabled = false;
+  }
+});
 bindIfExists('exportExcelBtn', async () => {
   const button = $('exportExcelBtn');
   button.disabled = true;

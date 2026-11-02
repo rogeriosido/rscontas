@@ -72,3 +72,76 @@
 @media (min-width:1000px){
   .management-header .management-tabs{flex-wrap:nowrap}
 }
+/* Isolated product catalog screen */
+.product-form{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,2fr) auto;gap:14px;align-items:end;margin-bottom:24px;padding:18px;background:#fff;border:1px solid #e9ebef;border-radius:14px}
+.products-table-wrap{overflow-x:auto;background:#fff;border:1px solid #e9ebef;border-radius:14px}
+.products-table{width:100%;border-collapse:collapse;text-align:left}
+.products-table th,.products-table td{padding:14px 16px;border-bottom:1px solid #edf1f4}
+.products-table th{background:#f8fafc;color:#555d68;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.products-table tbody tr:last-child td{border-bottom:0}
+.product-last-price{margin-bottom:8px;font-size:13px;font-weight:600;color:#303844}
+.product-last-price-date{font-weight:400;color:#687385}
+.product-actions{display:flex;align-items:center;gap:8px}
+.product-actions .btn{min-width:110px}
+.products-empty{display:none}
+@media(max-width:700px){.product-form{grid-template-columns:1fr}.product-form .btn{width:100%}}
+@media(max-width:700px){
+  .products-catalog-table{display:block;width:100%}
+  .products-catalog-table thead{display:none}
+  .products-catalog-table tbody{display:block;width:100%}
+  .products-catalog-table>tbody>tr{display:block;margin:10px;padding:8px 12px;border:1px solid #e4e8ee;border-radius:10px;background:#fff}
+  .products-catalog-table>tbody>tr>td{display:grid;grid-template-columns:minmax(105px,38%) minmax(0,1fr);align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid #edf1f4;overflow-wrap:anywhere}
+  .products-catalog-table>tbody>tr>td:nth-child(3){display:block}
+  .products-catalog-table>tbody>tr>td:nth-child(3)::before{display:block;margin-bottom:8px}
+  .products-catalog-table>tbody>tr>td:last-child{border-bottom:0}
+  .products-catalog-table>tbody>tr>td::before{content:attr(data-label);font-size:11px;font-weight:700;color:#555d68}
+  .products-catalog-table input{box-sizing:border-box;width:100%;min-width:0}
+  .products-catalog-table .product-save-btn,.products-catalog-table .product-cancel-btn{margin:2px 4px 2px 0}
+  .products-catalog-table .product-actions{display:flex;width:100%;gap:8px;flex-wrap:nowrap}
+  .products-catalog-table .product-actions .btn{flex:0 1 120px;min-width:104px;margin:0;padding:12px 14px;white-space:nowrap}
+}
+.invoice-import{margin:22px 0 24px;padding:20px;background:#fff;border:1px solid #e9ebef;border-radius:14px}
+.invoice-import-heading h3{font-size:16px;margin-bottom:5px}
+.invoice-import-heading p,.invoice-help{font-size:13px;color:#737b87;line-height:1.5}
+.invoice-key-row{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:12px;align-items:end}
+.invoice-key-row .field span{font-size:12px;font-weight:700;color:#555d68}
+.invoice-metadata-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.invoice-metadata-fields .field span{font-size:12px;font-weight:700;color:#555d68}
+.invoice-help{margin-top:10px}
+.invoice-capture-paste{display:grid;gap:8px;margin-top:14px;max-width:720px}
+.invoice-capture-paste label{font-size:12px;font-weight:700;color:#555d68}
+.invoice-capture-paste textarea{min-height:64px;font-family:monospace;font-size:12px}
+.invoice-capture-paste .btn{justify-self:start}
+.invoice-preview{margin-top:18px}
+.invoice-preview-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;font-size:13px}
+.invoice-products-table input[type="checkbox"]{width:18px;height:18px;accent-color:#15181d}
+.invoice-products-table input[type="text"]{min-width:150px}
+.product-prices-detail>td{padding:14px 16px!important;background:#f8fafc}
+.product-prices-scroll{display:block;width:100%;max-width:100%;overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.product-prices-table{display:table;width:max-content;min-width:650px;border-collapse:collapse;table-layout:auto;font-size:12px}
+.product-prices-table th,.product-prices-table td{padding:8px 10px;border-bottom:1px solid #e4e8ee;text-align:left}
+.product-prices-table th{background:#eef2f7;color:#4b5563}
+.product-prices-table td{white-space:nowrap}
+.product-price-delete-btn{padding:7px 10px;font-size:11px}
+.product-prices-empty{margin:8px 0 0;color:#687385;font-size:13px}
+.invoice-import-status{min-height:20px;margin-top:12px;font-size:13px;color:#374151}
+@media(max-width:700px){.invoice-key-row{grid-template-columns:1fr}.invoice-key-row .btn{width:100%}.invoice-metadata-fields{grid-template-columns:1fr}.invoice-preview-heading{align-items:flex-start;flex-direction:column}.invoice-preview-heading .btn,.invoice-capture-paste .btn{width:100%}}
+@media(max-width:700px){
+  .invoice-import{padding:14px}
+  .invoice-preview .products-table-wrap{overflow:visible}
+  .invoice-products-table{display:block;width:100%}
+  .invoice-products-table thead{display:none}
+  .invoice-products-table tbody,.invoice-products-table tfoot{display:block;width:100%}
+  .invoice-products-table tbody tr{display:block;margin:10px;padding:8px 12px;border:1px solid #e4e8ee;border-radius:10px;background:#fff}
+  .invoice-products-table tbody td{display:grid;grid-template-columns:minmax(105px,38%) minmax(0,1fr);align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid #edf1f4;overflow-wrap:anywhere}
+  .invoice-products-table tbody td:last-child{border-bottom:0}
+  .invoice-products-table tbody td::before{content:attr(data-label);font-size:11px;font-weight:700;color:#555d68}
+  .invoice-products-table input[type="text"]{box-sizing:border-box;width:100%;min-width:0}
+  .invoice-products-table tfoot tr{display:flex;justify-content:space-between;gap:12px;padding:12px 8px;font-size:13px}
+  .invoice-products-table tfoot th{padding:8px 4px;background:transparent}
+  .products-catalog-table>tbody>tr.product-prices-detail{margin:0 10px 10px;padding:0;border:0;background:transparent}
+  .products-catalog-table>tbody>tr.product-prices-detail>td{display:block;padding:12px!important;border:1px solid #e4e8ee;border-radius:8px;background:#f8fafc}
+  .products-catalog-table>tbody>tr.product-prices-detail>td::before{display:block;margin-bottom:6px}
+  .product-prices-scroll{display:block;width:100%;max-width:100%;overflow-x:auto}
+  .product-prices-table{display:table;width:max-content;min-width:650px}
+}

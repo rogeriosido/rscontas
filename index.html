@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#111827">
   <title>RS Contas</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/custom.css?v=20261018-2">
+  <link rel="stylesheet" href="css/custom.css?v=20261102-6">
 </head>
 <body>
   <main id="appContainer" class="main" style="display:none;">
     <header class="topbar">
       <div>
         <h1>Controle financeiro</h1>
-        <span id="appVersion" class="app-version">Versão 1.0.5</span>
+        <span id="appVersion" class="app-version">Versão 1.0.6</span>
       </div>
       <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
         <span id="userDisplay" style="display:none;margin-right:8px;"></span>
@@ -47,6 +47,12 @@
         <button id="managementBtn" class="action-card secondary-card" type="button" data-target="managementPanel" data-title="Cadastros">
           <span class="card-icon">⚙️</span>
           <span class="card-title">Cadastros</span>
+        </button>
+
+        <button id="productsBtn" class="action-card secondary-card" type="button" data-target="productsPanel" data-title="Produtos">
+          <span class="card-icon">🏷️</span>
+          <span class="card-title">Produtos</span>
+          <span class="card-subtitle">Consultar e cadastrar</span>
         </button>
       </div>
 
@@ -209,6 +215,64 @@
       </div>
     </section>
 
+    <section class="panel screen-panel hidden" id="productsPanel">
+      <div class="panel-title list-title">
+        <div><h2>Produtos</h2><p id="productsCount">0 produtos cadastrados</p></div>
+        <button class="btn secondary back-btn" type="button" data-back="dashboard">Voltar</button>
+      </div>
+      <form id="productForm" class="product-form">
+        <div class="field">
+          <label for="productBarcode">C&#243;digo de barras</label>
+          <input id="productBarcode" name="codigo_barras" type="text" inputmode="numeric" maxlength="80" placeholder="Ex.: 7891234567890" required>
+        </div>
+        <div class="field">
+          <label for="productName">Nome do produto</label>
+          <input id="productName" name="nome" type="text" maxlength="160" placeholder="Ex.: Caf&#233; em p&#243; 500 g" required>
+        </div>
+        <button class="btn primary" type="submit">Cadastrar produto</button>
+      </form>
+      <section class="invoice-import">
+        <div class="invoice-import-heading">
+          <div><h3>Consultar NFC-e pela chave</h3><p>Informe a chave de acesso para abrir a consulta oficial da SEFAZ-SP.</p></div>
+        </div>
+        <div class="invoice-key-row">
+          <label class="field" for="invoiceKey"><span>Chave de acesso (44 dígitos)</span>
+            <input id="invoiceKey" type="text" inputmode="numeric" maxlength="44" pattern="[0-9]{44}" placeholder="44 dígitos" autocomplete="off">
+          </label>
+          <button id="openInvoiceLookupBtn" class="btn secondary" type="button">Consultar NFC-e</button>
+        </div>
+        <div class="invoice-metadata-fields">
+          <label class="field" for="invoiceMarket"><span>Mercado</span><input id="invoiceMarket" type="text" maxlength="120" placeholder="Nome do mercado" required></label>
+          <label class="field" for="invoiceCoupon"><span>Cupom</span><input id="invoiceCoupon" type="text" maxlength="120" placeholder="N&#250;mero do cupom"></label>
+          <label class="field" for="invoiceDate"><span>Data</span><input id="invoiceDate" type="date" required></label>
+        </div>
+        <p class="invoice-help">Informe mercado, cupom e data. Cole os itens copiados da aba Produtos / Serviços para revisar quantidade e valor e registrar o histórico de preços.</p>
+        <div class="invoice-capture-paste">
+          <label for="invoiceCapturePayload">Itens copiados da consulta</label>
+          <textarea id="invoiceCapturePayload" rows="7" placeholder="Na SEFAZ, selecione os itens, pressione Ctrl+C. Volte aqui e pressione Ctrl+V."></textarea>
+          <button id="loadInvoiceCaptureBtn" class="btn secondary" type="button">Analisar itens</button>
+        </div>
+        <div id="invoiceCapturePreview" class="invoice-preview" hidden>
+          <div class="invoice-preview-heading"><strong id="invoiceCaptureSummary"></strong><button id="importCapturedProductsBtn" class="btn primary" type="button">Registrar produtos e pre&ccedil;os</button></div>
+          <div class="products-table-wrap">
+            <table class="products-table invoice-products-table">
+              <thead><tr><th>Registrar preço</th><th>Código</th><th>Produto</th><th>Quantidade</th><th>Valor unitário</th><th>Desconto</th><th>Valor líquido</th><th>Total</th></tr></thead>
+              <tbody id="invoiceCaptureBody"></tbody>
+              <tfoot id="invoiceCaptureFooter"></tfoot>
+            </table>
+          </div>
+        </div>
+        <p id="invoiceImportStatus" class="invoice-import-status" role="status" aria-live="polite"></p>
+      </section>
+      <div class="products-table-wrap">
+        <table class="products-table products-catalog-table">
+          <thead><tr><th>C&#243;digo de barras</th><th>Nome do produto</th><th>Pre&#231;os e a&#231;&#245;es</th></tr></thead>
+          <tbody id="productsTableBody"></tbody>
+        </table>
+        <p class="empty products-empty" id="productsEmpty">Nenhum produto cadastrado ainda.</p>
+      </div>
+    </section>
+
     <section class="panel screen-panel hidden" id="managementPanel">
       <div class="panel-title">
         <div><h2>Cadastros</h2><p>Gerencie os valores dinâmicos do sistema.</p></div>
@@ -322,6 +386,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.min.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=20261102-4"></script>
 </body>
 </html>

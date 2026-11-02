@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import calendar
+import math
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -86,6 +87,36 @@ def init_db():
             PRIMARY KEY (grupo, valor, user_id)
         )
         """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS produtos (
+            id TEXT PRIMARY KEY,
+            codigo_barras TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            UNIQUE (codigo_barras, user_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS precos_produtos (
+            id TEXT PRIMARY KEY,
+            produto_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            mercado TEXT NOT NULL,
+            cupom TEXT NOT NULL,
+            data TEXT NOT NULL,
+            quantidade REAL NOT NULL,
+            valor REAL NOT NULL,
+            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_precos_produtos_produto_data ON precos_produtos (produto_id, user_id, data DESC)"
     )
     # users table for auth
     conn.execute(
@@ -500,6 +531,202 @@ def api_get_contas():
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify(get_contas_from_db(user_id=user["id"]))
 
+
+@app.route("/api/produtos", methods=["GET"])
+def api_get_produtos():
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT p.id, p.codigo_barras, p.nome, "
+        "(SELECT pp.valor FROM precos_produtos pp WHERE pp.produto_id = p.id AND pp.user_id = p.user_id "
+        "ORDER BY pp.data DESC, pp.criado_em DESC, pp.id DESC LIMIT 1) AS ultimo_preco, "
+        "(SELECT pp.data FROM precos_produtos pp WHERE pp.produto_id = p.id AND pp.user_id = p.user_id "
+        "ORDER BY pp.data DESC, pp.criado_em DESC, pp.id DESC LIMIT 1) AS data_ultimo_preco "
+        "FROM produtos p WHERE p.user_id = ? ORDER BY p.nome COLLATE NOCASE",
+        (user["id"],),
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.route("/api/produtos", methods=["POST"])
+def api_add_produto():
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    codigo_barras = str(data.get("codigo_barras") or "").strip()
+    nome = str(data.get("nome") or "").strip()
+    if not codigo_barras or not nome:
+        return jsonify({"error": "C\u00f3digo de barras e nome s\u00e3o obrigat\u00f3rios"}), 400
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO produtos (id, codigo_barras, nome, user_id) VALUES (?, ?, ?, ?)",
+            (str(uuid.uuid4()), codigo_barras, nome, user["id"]),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "J\u00e1 existe um produto com este c\u00f3digo de barras"}), 409
+    finally:
+        conn.close()
+    return jsonify({"ok": True}), 201
+
+
+@app.route("/api/produtos/<produto_id>", methods=["PUT"])
+def api_update_produto(produto_id):
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    codigo_barras = str(data.get("codigo_barras") or "").strip()
+    nome = str(data.get("nome") or "").strip()
+    if not codigo_barras or not nome:
+        return jsonify({"error": "C\u00f3digo de barras e nome s\u00e3o obrigat\u00f3rios"}), 400
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            "UPDATE produtos SET codigo_barras = ?, nome = ? WHERE id = ? AND user_id = ?",
+            (codigo_barras[:80], nome[:160], produto_id, user["id"]),
+        )
+        if cursor.rowcount == 0:
+            return jsonify({"error": "Produto n\u00e3o encontrado"}), 404
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "J\u00e1 existe outro produto com este c\u00f3digo de barras"}), 409
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/produtos/<produto_id>/precos", methods=["GET"])
+def api_get_precos_produto(produto_id):
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db_connection()
+    try:
+        produto = conn.execute(
+            "SELECT id FROM produtos WHERE id = ? AND user_id = ?",
+            (produto_id, user["id"]),
+        ).fetchone()
+        if not produto:
+            return jsonify({"error": "Produto n\u00e3o encontrado"}), 404
+        rows = conn.execute(
+            "SELECT id, mercado, cupom, data, quantidade, valor FROM precos_produtos "
+            "WHERE produto_id = ? AND user_id = ? ORDER BY data DESC, criado_em DESC",
+            (produto_id, user["id"]),
+        ).fetchall()
+        return jsonify([dict(row) for row in rows])
+    finally:
+        conn.close()
+
+
+@app.route("/api/produtos/precos/<preco_id>", methods=["DELETE"])
+def api_delete_preco_produto(preco_id):
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            "DELETE FROM precos_produtos WHERE id = ? AND user_id = ?",
+            (preco_id, user["id"]),
+        )
+        if cursor.rowcount == 0:
+            return jsonify({"error": "Registro de pre\u00e7o n\u00e3o encontrado"}), 404
+        conn.commit()
+        return jsonify({"ok": True})
+    finally:
+        conn.close()
+
+
+@app.route("/api/produtos/importar", methods=["POST"])
+def api_importar_produtos():
+    user = _require_user(request)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    payload = request.get_json(silent=True) or {}
+    produtos = payload.get("produtos")
+    if not isinstance(produtos, list) or not produtos or len(produtos) > 1000:
+        return jsonify({"error": "Envie uma lista com at\u00e9 1000 produtos"}), 400
+    mercado = str(payload.get("mercado") or "").strip()[:120]
+    cupom = str(payload.get("cupom") or "").strip()[:120]
+    data_preco = str(payload.get("data") or "").strip()
+    if not mercado or not cupom or not data_preco:
+        return jsonify({"error": "Informe o mercado, o n\u00famero do cupom e a data"}), 400
+    try:
+        datetime.strptime(data_preco, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Informe uma data v\u00e1lida"}), 400
+
+    def parse_local_number(value):
+        text = str(value or "").strip()
+        if "," in text:
+            text = text.replace(".", "").replace(",", ".")
+        return float(text)
+
+    normalizados = []
+    for item in produtos:
+        if not isinstance(item, dict):
+            return jsonify({"error": "Item de produto inv\u00e1lido"}), 400
+        codigo = str(item.get("codigo_barras") or "").strip()
+        nome = str(item.get("nome") or "").strip()
+        if not codigo or not nome:
+            return jsonify({"error": "Todos os produtos precisam de c\u00f3digo de barras e nome"}), 400
+        try:
+            quantidade = parse_local_number(item.get("quantidade"))
+            valor = parse_local_number(item.get("valor"))
+        except ValueError:
+            return jsonify({"error": "Quantidade e valor devem ser num\u00e9ricos"}), 400
+        if not math.isfinite(quantidade) or not math.isfinite(valor) or quantidade <= 0 or valor < 0:
+            return jsonify({"error": "Quantidade deve ser maior que zero e valor n\u00e3o pode ser negativo"}), 400
+        normalizados.append((codigo[:80], nome[:160], quantidade, valor))
+
+    conn = get_db_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cupom_existente = conn.execute(
+            "SELECT 1 FROM precos_produtos WHERE user_id = ? AND cupom = ? COLLATE NOCASE LIMIT 1",
+            (user["id"], cupom),
+        ).fetchone()
+        if cupom_existente:
+            conn.rollback()
+            return jsonify({"error": "Este n\u00famero de cupom j\u00e1 foi importado."}), 409
+        produtos_inseridos = 0
+        produtos_existentes = 0
+        precos_inseridos = 0
+        for codigo, nome, quantidade, valor in normalizados:
+            produto = conn.execute(
+                "SELECT id FROM produtos WHERE codigo_barras = ? AND user_id = ?",
+                (codigo, user["id"]),
+            ).fetchone()
+            if produto:
+                produto_id = produto["id"]
+                produtos_existentes += 1
+            else:
+                produto_id = str(uuid.uuid4())
+                conn.execute(
+                    "INSERT INTO produtos (id, codigo_barras, nome, user_id) VALUES (?, ?, ?, ?)",
+                    (produto_id, codigo, nome, user["id"]),
+                )
+                produtos_inseridos += 1
+            conn.execute(
+                "INSERT INTO precos_produtos (id, produto_id, user_id, mercado, cupom, data, quantidade, valor) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), produto_id, user["id"], mercado, cupom, data_preco, quantidade, valor),
+            )
+            precos_inseridos += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({
+        "produtos_inseridos": produtos_inseridos,
+        "produtos_existentes": produtos_existentes,
+        "precos_inseridos": precos_inseridos,
+    })
 
 @app.post("/api/contas/<id>/gerar-parcelas")
 def api_gerar_parcelas(id):
